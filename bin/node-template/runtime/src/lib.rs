@@ -15,6 +15,7 @@ use sp_runtime::{
 use sp_runtime::traits::{
 	BlakeTwo256, Block as BlockT, IdentityLookup, Verify, IdentifyAccount, NumberFor, Saturating, SaturatedConversion
 };
+use frame_system::EnsureRoot;
 use sp_api::impl_runtime_apis;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use pallet_grandpa::{AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList};
@@ -339,6 +340,22 @@ impl pallet_scheduler::Trait for Runtime {
     type WeightInfo = ();
 }
 
+parameter_types! {
+    pub const MaxWellKnownNodes: u32 = 8;
+    pub const MaxPeerIdLength: u32 = 128;
+}
+
+impl pallet_node_authorization::Trait for Runtime {
+    type Event = Event;
+    type MaxWellKnownNodes = MaxWellKnownNodes;
+    type MaxPeerIdLength = MaxPeerIdLength;
+    type AddOrigin = EnsureRoot<AccountId>;
+    type RemoveOrigin = EnsureRoot<AccountId>;
+    type SwapOrigin = EnsureRoot<AccountId>;
+    type ResetOrigin = EnsureRoot<AccountId>;
+    type WeightInfo = ();
+}
+
 /// Payload data to be signed when making signed transaction from off-chain workers,
 ///   inside `create_transaction` function.
 pub type SignedPayload = generic::SignedPayload<Call, SignedExtra>;
@@ -427,7 +444,8 @@ construct_runtime!(
 		Contracts: pallet_contracts::{Module, Call, Config, Storage, Event<T>},
 		Scheduler: pallet_scheduler::{Module, Call, Storage, Event<T>},
 		// To use unsigned and signed transactions
-		OcwFQSrequest: ocw_fqs_request::{Module, Call, Event<T>}
+		OcwFQSrequest: ocw_fqs_request::{Module, Call, Event<T>},
+		NodeAuthorization: pallet_node_authorization::{Module, Call, Storage, Event<T>, Config<T>},
 	}
 );
 

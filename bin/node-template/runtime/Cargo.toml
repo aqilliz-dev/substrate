@@ -52,6 +52,7 @@ ocw-fqs-request = { version = "2.0.0", default-features = false, path = "./src/o
 pallet-contracts = { version = '2.0.0', default-features = false, path = "../../../frame/contracts" }
 pallet-contracts-primitives = { version = "2.0.0", default-features = false, path = "../../../frame/contracts/common/" }
 pallet-contracts-rpc-runtime-api = { version = "0.8.0", default-features = false, path = "../../../frame/contracts/rpc/runtime-api/" }
+pallet-node-authorization = { version = '2.0.0', default-features = false, path = "../../../frame/node-authorization" }
 
 pallet-scheduler = { version = "2.0.0", default-features = false, path = "../../../frame/scheduler" }
 
@@ -92,6 +93,7 @@ std = [
     'pallet-contracts-primitives/std',
 	'pallet-contracts-rpc-runtime-api/std',
 	'pallet-scheduler/std',
+	'pallet-node-authorization/std',
 	'ocw-fqs-request/std'
 ]
 runtime-benchmarks = [
