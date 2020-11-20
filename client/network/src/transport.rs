@@ -19,14 +19,14 @@
 use libp2p::{
 	InboundUpgradeExt, OutboundUpgradeExt, PeerId, Transport,
 	core::{
-		self, either::{EitherOutput, EitherTransport}, muxing::StreamMuxerBox,
-		transport::{Boxed, OptionalTransport}, upgrade
+		self, either::EitherOutput, muxing::StreamMuxerBox,
+		transport::{boxed::Boxed, OptionalTransport}, upgrade
 	},
 	mplex, identity, bandwidth, wasm_ext, noise
 };
 #[cfg(not(target_os = "unknown"))]
 use libp2p::{tcp, dns, websocket};
-use std::{sync::Arc, time::Duration};
+use std::{io, sync::Arc, time::Duration};
 
 pub use self::bandwidth::BandwidthSinks;
 
@@ -41,7 +41,8 @@ pub fn build_transport(
 	keypair: identity::Keypair,
 	memory_only: bool,
 	wasm_external_transport: Option<wasm_ext::ExtTransport>,
-) -> (Boxed<(PeerId, StreamMuxerBox)>, Arc<BandwidthSinks>) {
+	use_yamux_flow_control: bool
+) -> (Boxed<(PeerId, StreamMuxerBox), io::Error>, Arc<BandwidthSinks>) {
 	// Build the base layer of the transport.
 	let transport = if let Some(t) = wasm_external_transport {
 		OptionalTransport::some(t)
@@ -54,9 +55,9 @@ pub fn build_transport(
 		let desktop_trans = websocket::WsConfig::new(desktop_trans.clone())
 			.or_transport(desktop_trans);
 		OptionalTransport::some(if let Ok(dns) = dns::DnsConfig::new(desktop_trans.clone()) {
-			EitherTransport::Left(dns)
+			dns.boxed()
 		} else {
-			EitherTransport::Right(desktop_trans.map_err(dns::DnsErr::Underlying))
+			desktop_trans.map_err(dns::DnsErr::Underlying).boxed()
 		})
 	} else {
 		OptionalTransport::none()
@@ -85,6 +86,7 @@ pub fn build_transport(
 
 		// Legacy noise configurations for backward compatibility.
 		let mut noise_legacy = noise::LegacyConfig::default();
+		noise_legacy.send_legacy_handshake = true;
 		noise_legacy.recv_legacy_handshake = true;
 
 		let mut xx_config = noise::NoiseConfig::xx(noise_keypair_spec);
@@ -104,21 +106,27 @@ pub fn build_transport(
 
 	let multiplexing_config = {
 		let mut mplex_config = mplex::MplexConfig::new();
-		mplex_config.set_max_buffer_behaviour(mplex::MaxBufferBehaviour::Block);
-		mplex_config.set_max_buffer_size(usize::MAX);
+		mplex_config.max_buffer_len_behaviour(mplex::MaxBufferBehaviour::Block);
+		mplex_config.max_buffer_len(usize::MAX);
 
-		let mut yamux_config = libp2p::yamux::YamuxConfig::default();
-		// Enable proper flow-control: window updates are only sent when
-		// buffered data has been consumed.
-		yamux_config.set_window_update_mode(libp2p::yamux::WindowUpdateMode::on_read());
+		let mut yamux_config = libp2p::yamux::Config::default();
+
+		if use_yamux_flow_control {
+			// Enable proper flow-control: window updates are only sent when
+			// buffered data has been consumed.
+			yamux_config.set_window_update_mode(libp2p::yamux::WindowUpdateMode::OnRead);
+		}
 
 		core::upgrade::SelectUpgrade::new(yamux_config, mplex_config)
+			.map_inbound(move |muxer| core::muxing::StreamMuxerBox::new(muxer))
+			.map_outbound(move |muxer| core::muxing::StreamMuxerBox::new(muxer))
 	};
 
 	let transport = transport.upgrade(upgrade::Version::V1)
 		.authenticate(authentication_config)
 		.multiplex(multiplexing_config)
 		.timeout(Duration::from_secs(20))
+		.map_err(|err| io::Error::new(io::ErrorKind::Other, err))
 		.boxed();
 
 	(transport, bandwidth)

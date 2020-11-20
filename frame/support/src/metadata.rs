@@ -27,14 +27,12 @@ pub use frame_metadata::{
 /// Example:
 /// ```
 ///# mod module0 {
-///#    pub trait Trait: 'static {
+///#    pub trait Trait {
 ///#        type Origin;
 ///#        type BlockNumber;
-///#        type PalletInfo: frame_support::traits::PalletInfo;
-///#        type DbWeight: frame_support::traits::Get<frame_support::weights::RuntimeDbWeight>;
 ///#    }
 ///#    frame_support::decl_module! {
-///#        pub struct Module<T: Trait> for enum Call where origin: T::Origin, system=self {}
+///#        pub struct Module<T: Trait> for enum Call where origin: T::Origin {}
 ///#    }
 ///#
 ///#    frame_support::decl_storage! {
@@ -46,8 +44,6 @@ pub use frame_metadata::{
 ///# impl module0::Trait for Runtime {
 ///#     type Origin = u32;
 ///#     type BlockNumber = u32;
-///#     type PalletInfo = ();
-///#     type DbWeight = ();
 ///# }
 ///#
 ///# type UncheckedExtrinsic = sp_runtime::generic::UncheckedExtrinsic<(), (), (), ()>;
@@ -306,12 +302,11 @@ mod tests {
 			type BlockNumber: From<u32> + Encode;
 			type SomeValue: Get<u32>;
 			type PalletInfo: crate::traits::PalletInfo;
-			type DbWeight: crate::traits::Get<crate::weights::RuntimeDbWeight>;
 			type Call;
 		}
 
 		decl_module! {
-			pub struct Module<T: Trait> for enum Call where origin: T::Origin, system=self {
+			pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 				/// Hi, I am a comment.
 				const BlockNumber: T::BlockNumber = 100.into();
 				const GetType: T::AccountId = T::SomeValue::get().into();
@@ -346,9 +341,8 @@ mod tests {
 
 	mod event_module {
 		use crate::dispatch::DispatchResult;
-		use super::system;
 
-		pub trait Trait: system::Trait {
+		pub trait Trait: super::system::Trait {
 			type Balance;
 		}
 
@@ -361,7 +355,7 @@ mod tests {
 		);
 
 		decl_module! {
-			pub struct Module<T: Trait> for enum Call where origin: T::Origin, system=system {
+			pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 				type Error = Error<T>;
 
 				#[weight = 0]
@@ -381,10 +375,10 @@ mod tests {
 	}
 
 	mod event_module2 {
-		use super::system;
-
-		pub trait Trait: system::Trait {
+		pub trait Trait {
+			type Origin;
 			type Balance;
+			type BlockNumber;
 		}
 
 		decl_event!(
@@ -395,7 +389,7 @@ mod tests {
 		);
 
 		decl_module! {
-			pub struct Module<T: Trait> for enum Call where origin: T::Origin, system=system {}
+			pub struct Module<T: Trait> for enum Call where origin: T::Origin {}
 		}
 
 		crate::decl_storage! {
@@ -438,7 +432,9 @@ mod tests {
 	}
 
 	impl event_module2::Trait for TestRuntime {
+		type Origin = Origin;
 		type Balance = u32;
+		type BlockNumber = u32;
 	}
 
 	crate::parameter_types! {
@@ -452,7 +448,6 @@ mod tests {
 		type BlockNumber = u32;
 		type SomeValue = SystemValue;
 		type PalletInfo = ();
-		type DbWeight = ();
 		type Call = Call;
 	}
 

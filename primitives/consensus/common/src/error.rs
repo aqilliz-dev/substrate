@@ -24,73 +24,73 @@ use std::error;
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Error type.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, derive_more::Display, derive_more::From)]
 pub enum Error {
 	/// Missing state at block with given descriptor.
-	#[error("State unavailable at block {0}")]
+	#[display(fmt="State unavailable at block {}", _0)]
 	StateUnavailable(String),
 	/// I/O terminated unexpectedly
-	#[error("I/O terminated unexpectedly.")]
+	#[display(fmt="I/O terminated unexpectedly.")]
 	IoTerminated,
 	/// Intermediate missing.
-	#[error("Missing intermediate.")]
+	#[display(fmt="Missing intermediate.")]
 	NoIntermediate,
 	/// Intermediate is of wrong type.
-	#[error("Invalid intermediate.")]
+	#[display(fmt="Invalid intermediate.")]
 	InvalidIntermediate,
 	/// Unable to schedule wake-up.
-	#[error("Timer error: {0}")]
-	FaultyTimer(#[from] std::io::Error),
+	#[display(fmt="Timer error: {}", _0)]
+	FaultyTimer(std::io::Error),
 	/// Error while working with inherent data.
-	#[error("InherentData error: {0}")]
-	InherentData(#[from] sp_inherents::Error),
+	#[display(fmt="InherentData error: {}", _0)]
+	InherentData(sp_inherents::Error),
 	/// Unable to propose a block.
-	#[error("Unable to create block proposal.")]
+	#[display(fmt="Unable to create block proposal.")]
 	CannotPropose,
 	/// Error checking signature
-	#[error("Message signature {0:?} by {1:?} is invalid.")]
+	#[display(fmt="Message signature {:?} by {:?} is invalid.", _0, _1)]
 	InvalidSignature(Vec<u8>, Vec<u8>),
 	/// Invalid authorities set received from the runtime.
-	#[error("Current state of blockchain has invalid authorities set")]
+	#[display(fmt="Current state of blockchain has invalid authorities set")]
 	InvalidAuthoritiesSet,
 	/// Account is not an authority.
-	#[error("Message sender {0:?} is not a valid authority")]
+	#[display(fmt="Message sender {:?} is not a valid authority.", _0)]
 	InvalidAuthority(Public),
 	/// Authoring interface does not match the runtime.
-	#[error("Authoring for current \
-				runtime is not supported. Native ({native}) cannot author for on-chain ({on_chain}).")]
+	#[display(fmt="Authoring for current \
+				runtime is not supported. Native ({}) cannot author for on-chain ({}).", native, on_chain)]
 	IncompatibleAuthoringRuntime { native: RuntimeVersion, on_chain: RuntimeVersion },
 	/// Authoring interface does not match the runtime.
-	#[error("Authoring for current runtime is not supported since it has no version.")]
+	#[display(fmt="Authoring for current runtime is not supported since it has no version.")]
 	RuntimeVersionMissing,
 	/// Authoring interface does not match the runtime.
-	#[error("Authoring in current build is not supported since it has no runtime.")]
+	#[display(fmt="Authoring in current build is not supported since it has no runtime.")]
 	NativeRuntimeMissing,
 	/// Justification requirements not met.
-	#[error("Invalid justification.")]
+	#[display(fmt="Invalid justification.")]
 	InvalidJustification,
 	/// Some other error.
-	#[error(transparent)]
-	Other(#[from] Box<dyn error::Error + Sync + Send + 'static>),
+	#[display(fmt="Other error: {}", _0)]
+	Other(Box<dyn error::Error + Send>),
 	/// Error from the client while importing
-	#[error("Import failed: {0}")]
+	#[display(fmt="Import failed: {}", _0)]
+	#[from(ignore)]
 	ClientImport(String),
 	/// Error from the client while importing
-	#[error("Chain lookup failed: {0}")]
+	#[display(fmt="Chain lookup failed: {}", _0)]
+	#[from(ignore)]
 	ChainLookup(String),
 	/// Signing failed
-	#[error("Failed to sign using key: {0:?}. Reason: {1}")]
+	#[display(fmt="Failed to sign using key: {:?}. Reason: {}", _0, _1)]
 	CannotSign(Vec<u8>, String)
 }
 
-impl core::convert::From<Public> for Error {
-	fn from(p: Public) -> Self {
-		Self::InvalidAuthority(p)
-	}
-}
-
-impl core::convert::From<String> for Error {
-	fn from(s: String) -> Self {
-		Self::StateUnavailable(s)
+impl error::Error for Error {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			Error::FaultyTimer(ref err) => Some(err),
+			Error::Other(ref err) => Some(&**err),
+			_ => None,
+		}
 	}
 }

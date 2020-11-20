@@ -325,15 +325,13 @@ mod test_iterators {
 		storage::{generator::StorageMap, IterableStorageMap, unhashed},
 	};
 
-	pub trait Trait: 'static {
+	pub trait Trait {
 		type Origin;
 		type BlockNumber;
-		type PalletInfo: crate::traits::PalletInfo;
-		type DbWeight: crate::traits::Get<crate::weights::RuntimeDbWeight>;
 	}
 
 	crate::decl_module! {
-		pub struct Module<T: Trait> for enum Call where origin: T::Origin, system=self {}
+		pub struct Module<T: Trait> for enum Call where origin: T::Origin {}
 	}
 
 	#[derive(PartialEq, Eq, Clone, Encode, Decode)]

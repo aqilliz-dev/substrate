@@ -22,19 +22,12 @@
 #![warn(missing_docs)]
 #![deny(warnings)]
 
-#[cfg(test)]
-mod pallet_version;
-
 /// The configuration trait
-pub trait Trait: 'static {
+pub trait Trait {
 	/// The runtime origin type.
-	type Origin: codec::Codec + codec::EncodeLike + Default;
+	type Origin;
 	/// The block number type.
-	type BlockNumber: codec::Codec + codec::EncodeLike + Default;
-	/// The information about the pallet setup in the runtime.
-	type PalletInfo: frame_support::traits::PalletInfo;
-	/// The db weights.
-	type DbWeight: frame_support::traits::Get<frame_support::weights::RuntimeDbWeight>;
+	type BlockNumber;
 }
 
 frame_support::decl_module! {

@@ -35,16 +35,11 @@
 //! # let txpool = BasicPool::new_full(
 //! #     Default::default(),
 //! #     None,
-//! #     spawner.clone(),
+//! #     spawner,
 //! #     client.clone(),
 //! # );
 //! // The first step is to create a `ProposerFactory`.
-//! let mut proposer_factory = ProposerFactory::new(
-//!		spawner,
-//!		client.clone(),
-//!		txpool.clone(),
-//!		None,
-//!	);
+//! let mut proposer_factory = ProposerFactory::new(client.clone(), txpool.clone(), None);
 //!
 //! // From this factory, we create a `Proposer`.
 //! let proposer = proposer_factory.init(

@@ -23,7 +23,7 @@ use futures::prelude::*;
 use futures::channel::mpsc::{channel, Sender, Receiver};
 use libp2p::PeerId;
 use log::trace;
-use sp_runtime::traits::Block as BlockT;
+use sp_runtime::{traits::Block as BlockT, ConsensusEngineId};
 use std::{
 	borrow::Cow,
 	collections::{HashMap, VecDeque},
@@ -38,7 +38,7 @@ pub struct GossipEngine<B: BlockT> {
 	state_machine: ConsensusGossip<B>,
 	network: Box<dyn Network<B> + Send>,
 	periodic_maintenance_interval: futures_timer::Delay,
-	protocol: Cow<'static, str>,
+	engine_id: ConsensusEngineId,
 
 	/// Incoming events from the network.
 	network_event_stream: Pin<Box<dyn Stream<Item = Event> + Send>>,
@@ -68,21 +68,20 @@ impl<B: BlockT> GossipEngine<B> {
 	/// Create a new instance.
 	pub fn new<N: Network<B> + Send + Clone + 'static>(
 		network: N,
-		protocol: impl Into<Cow<'static, str>>,
+		engine_id: ConsensusEngineId,
+		protocol_name: impl Into<Cow<'static, str>>,
 		validator: Arc<dyn Validator<B>>,
 	) -> Self where B: 'static {
-		let protocol = protocol.into();
-
 		// We grab the event stream before registering the notifications protocol, otherwise we
 		// might miss events.
 		let network_event_stream = network.event_stream();
-		network.register_notifications_protocol(protocol.clone());
+		network.register_notifications_protocol(engine_id, protocol_name.into());
 
 		GossipEngine {
-			state_machine: ConsensusGossip::new(validator, protocol.clone()),
+			state_machine: ConsensusGossip::new(validator, engine_id),
 			network: Box::new(network),
 			periodic_maintenance_interval: futures_timer::Delay::new(PERIODIC_MAINTENANCE_INTERVAL),
-			protocol,
+			engine_id,
 
 			network_event_stream,
 			message_sinks: HashMap::new(),
@@ -182,21 +181,21 @@ impl<B: BlockT> Future for GossipEngine<B> {
 				ForwardingState::Idle => {
 					match this.network_event_stream.poll_next_unpin(cx) {
 						Poll::Ready(Some(event)) => match event {
-							Event::NotificationStreamOpened { remote, protocol, role } => {
-								if protocol != this.protocol {
+							Event::NotificationStreamOpened { remote, engine_id, role } => {
+								if engine_id != this.engine_id {
 									continue;
 								}
 								this.state_machine.new_peer(&mut *this.network, remote, role);
 							}
-							Event::NotificationStreamClosed { remote, protocol } => {
-								if protocol != this.protocol {
+							Event::NotificationStreamClosed { remote, engine_id } => {
+								if engine_id != this.engine_id {
 									continue;
 								}
 								this.state_machine.peer_disconnected(&mut *this.network, remote);
 							},
 							Event::NotificationsReceived { remote, messages } => {
 								let messages = messages.into_iter().filter_map(|(engine, data)| {
-									if engine == this.protocol {
+									if engine == this.engine_id {
 										Some(data.to_vec())
 									} else {
 										None
@@ -300,7 +299,6 @@ mod tests {
 	use rand::Rng;
 	use sc_network::ObservedRole;
 	use sp_runtime::{testing::H256, traits::{Block as BlockT}};
-	use std::borrow::Cow;
 	use std::convert::TryInto;
 	use std::sync::{Arc, Mutex};
 	use substrate_test_runtime_client::runtime::Block;
@@ -331,11 +329,11 @@ mod tests {
 			unimplemented!();
 		}
 
-		fn write_notification(&self, _: PeerId, _: Cow<'static, str>, _: Vec<u8>) {
+		fn write_notification(&self, _: PeerId, _: ConsensusEngineId, _: Vec<u8>) {
 			unimplemented!();
 		}
 
-		fn register_notifications_protocol(&self, _: Cow<'static, str>) {}
+		fn register_notifications_protocol(&self, _: ConsensusEngineId, _: Cow<'static, str>) {}
 
 		fn announce(&self, _: B::Hash, _: Vec<u8>) {
 			unimplemented!();
@@ -363,7 +361,8 @@ mod tests {
 		let network = TestNetwork::default();
 		let mut gossip_engine = GossipEngine::<Block>::new(
 			network.clone(),
-			"/my_protocol",
+			[1, 2, 3, 4],
+			"my_protocol",
 			Arc::new(AllowAll{}),
 		);
 
@@ -384,13 +383,14 @@ mod tests {
 	#[test]
 	fn keeps_multiple_subscribers_per_topic_updated_with_both_old_and_new_messages() {
 		let topic = H256::default();
-		let protocol = Cow::Borrowed("/my_protocol");
+		let engine_id = [1, 2, 3, 4];
 		let remote_peer = PeerId::random();
 		let network = TestNetwork::default();
 
 		let mut gossip_engine = GossipEngine::<Block>::new(
 			network.clone(),
-			protocol.clone(),
+			engine_id.clone(),
+			"my_protocol",
 			Arc::new(AllowAll{}),
 		);
 
@@ -404,7 +404,7 @@ mod tests {
 		event_sender.start_send(
 			Event::NotificationStreamOpened {
 				remote: remote_peer.clone(),
-				protocol: protocol.clone(),
+				engine_id: engine_id.clone(),
 				role: ObservedRole::Authority,
 			}
 		).expect("Event stream is unbounded; qed.");
@@ -413,7 +413,7 @@ mod tests {
 		let events = messages.iter().cloned().map(|m| {
 			Event::NotificationsReceived {
 				remote: remote_peer.clone(),
-				messages: vec![(protocol.clone(), m.into())]
+				messages: vec![(engine_id, m.into())]
 			}
 		}).collect::<Vec<_>>();
 
@@ -498,7 +498,7 @@ mod tests {
 		}
 
 		fn prop(channels: Vec<ChannelLengthAndTopic>, notifications: Vec<Vec<Message>>) {
-			let protocol = Cow::Borrowed("/my_protocol");
+			let engine_id = [1, 2, 3, 4];
 			let remote_peer = PeerId::random();
 			let network = TestNetwork::default();
 
@@ -524,7 +524,8 @@ mod tests {
 
 			let mut gossip_engine = GossipEngine::<Block>::new(
 				network.clone(),
-				protocol.clone(),
+				engine_id.clone(),
+				"my_protocol",
 				Arc::new(TestValidator{}),
 			);
 
@@ -557,7 +558,7 @@ mod tests {
 			event_sender.start_send(
 				Event::NotificationStreamOpened {
 					remote: remote_peer.clone(),
-					protocol: protocol.clone(),
+					engine_id: engine_id.clone(),
 					role: ObservedRole::Authority,
 				}
 			).expect("Event stream is unbounded; qed.");
@@ -575,7 +576,7 @@ mod tests {
 						message.push(i_notification.try_into().unwrap());
 						message.push(i_message.try_into().unwrap());
 
-						(protocol.clone(), message.into())
+						(engine_id, message.into())
 					}).collect();
 
 				event_sender.start_send(Event::NotificationsReceived {

@@ -77,7 +77,6 @@ macro_rules! decl_error {
 				$generic:ident: $trait:path
 				$(, $inst_generic:ident: $instance:path)?
 			>
-			$( where $( $where_ty:ty: $where_bound:path ),* $(,)? )?
 		{
 			$(
 				$( #[doc = $doc_attr:tt] )*
@@ -87,9 +86,7 @@ macro_rules! decl_error {
 		}
 	) => {
 		$(#[$attr])*
-		pub enum $error<$generic: $trait $(, $inst_generic: $instance)?>
-		$( where $( $where_ty: $where_bound ),* )?
-		{
+		pub enum $error<$generic: $trait $(, $inst_generic: $instance)?> {
 			#[doc(hidden)]
 			__Ignore(
 				$crate::sp_std::marker::PhantomData<($generic, $( $inst_generic)?)>,
@@ -103,16 +100,13 @@ macro_rules! decl_error {
 
 		impl<$generic: $trait $(, $inst_generic: $instance)?> $crate::sp_std::fmt::Debug
 			for $error<$generic $(, $inst_generic)?>
-		$( where $( $where_ty: $where_bound ),* )?
 		{
 			fn fmt(&self, f: &mut $crate::sp_std::fmt::Formatter<'_>) -> $crate::sp_std::fmt::Result {
 				f.write_str(self.as_str())
 			}
 		}
 
-		impl<$generic: $trait $(, $inst_generic: $instance)?> $error<$generic $(, $inst_generic)?>
-		$( where $( $where_ty: $where_bound ),* )?
-		{
+		impl<$generic: $trait $(, $inst_generic: $instance)?> $error<$generic $(, $inst_generic)?> {
 			fn as_u8(&self) -> u8 {
 				$crate::decl_error! {
 					@GENERATE_AS_U8
@@ -136,7 +130,6 @@ macro_rules! decl_error {
 
 		impl<$generic: $trait $(, $inst_generic: $instance)?> From<$error<$generic $(, $inst_generic)?>>
 			for &'static str
-		$( where $( $where_ty: $where_bound ),* )?
 		{
 			fn from(err: $error<$generic $(, $inst_generic)?>) -> &'static str {
 				err.as_str()
@@ -145,7 +138,6 @@ macro_rules! decl_error {
 
 		impl<$generic: $trait $(, $inst_generic: $instance)?> From<$error<$generic $(, $inst_generic)?>>
 			for $crate::sp_runtime::DispatchError
-		$( where $( $where_ty: $where_bound ),* )?
 		{
 			fn from(err: $error<$generic $(, $inst_generic)?>) -> Self {
 				let index = <$generic::PalletInfo as $crate::traits::PalletInfo>
@@ -162,7 +154,6 @@ macro_rules! decl_error {
 
 		impl<$generic: $trait $(, $inst_generic: $instance)?> $crate::error::ModuleErrorMetadata
 			for $error<$generic $(, $inst_generic)?>
-		$( where $( $where_ty: $where_bound ),* )?
 		{
 			fn metadata() -> &'static [$crate::error::ErrorMetadata] {
 				&[

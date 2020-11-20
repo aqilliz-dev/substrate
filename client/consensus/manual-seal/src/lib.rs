@@ -294,10 +294,9 @@ mod tests {
 		let inherent_data_providers = InherentDataProviders::new();
 		let spawner = sp_core::testing::TaskExecutor::new();
 		let pool = Arc::new(BasicPool::with_revalidation_type(
-			Options::default(), api(), None, RevalidationType::Full, spawner.clone(),
+			Options::default(), api(), None, RevalidationType::Full, spawner,
 		));
 		let env = ProposerFactory::new(
-			spawner.clone(),
 			client.clone(),
 			pool.clone(),
 			None,
@@ -366,10 +365,9 @@ mod tests {
 		let inherent_data_providers = InherentDataProviders::new();
 		let spawner = sp_core::testing::TaskExecutor::new();
 		let pool = Arc::new(BasicPool::with_revalidation_type(
-			Options::default(), api(), None, RevalidationType::Full, spawner.clone(),
+			Options::default(), api(), None, RevalidationType::Full, spawner,
 		));
 		let env = ProposerFactory::new(
-			spawner.clone(),
 			client.clone(),
 			pool.clone(),
 			None,
@@ -442,10 +440,9 @@ mod tests {
 		let pool_api = api();
 		let spawner = sp_core::testing::TaskExecutor::new();
 		let pool = Arc::new(BasicPool::with_revalidation_type(
-			Options::default(), pool_api.clone(), None, RevalidationType::Full, spawner.clone(),
+			Options::default(), pool_api.clone(), None, RevalidationType::Full, spawner,
 		));
 		let env = ProposerFactory::new(
-			spawner.clone(),
 			client.clone(),
 			pool.clone(),
 			None,

@@ -31,7 +31,6 @@ use frame_support::traits::{Get, StorageMapShim};
 use frame_support::weights::{Weight, DispatchInfo, IdentityFee};
 use std::cell::RefCell;
 use crate::{GenesisConfig, Module, Trait, decl_tests, tests::CallWithDispatchInfo};
-use pallet_transaction_payment::CurrencyAdapter;
 
 use frame_system as system;
 impl_outer_origin!{
@@ -98,7 +97,8 @@ parameter_types! {
 	pub const TransactionByteFee: u64 = 1;
 }
 impl pallet_transaction_payment::Trait for Test {
-	type OnChargeTransaction = CurrencyAdapter<Module<Test>, ()>;
+	type Currency = Module<Test>;
+	type OnTransactionPayment = ();
 	type TransactionByteFee = TransactionByteFee;
 	type WeightToFee = IdentityFee<u64>;
 	type FeeMultiplierUpdate = ();

@@ -63,8 +63,7 @@ use frame_system::{self as system, ensure_signed, ensure_root};
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
-pub mod weights;
-pub use weights::WeightInfo;
+mod default_weight;
 
 /// Simple index type for proposal counting.
 pub type ProposalIndex = u32;
@@ -119,6 +118,19 @@ impl DefaultVote for MoreThanMajorityThenPrimeDefaultVote {
 		let more_than_majority = yes_votes * 2 > len;
 		more_than_majority || prime_vote.unwrap_or(false)
 	}
+}
+
+pub trait WeightInfo {
+	fn set_members(m: u32, n: u32, p: u32, ) -> Weight;
+	fn execute(b: u32, m: u32, ) -> Weight;
+	fn propose_execute(b: u32, m: u32, ) -> Weight;
+	fn propose_proposed(b: u32, m: u32, p: u32, ) -> Weight;
+	fn vote(m: u32, ) -> Weight;
+	fn close_early_disapproved(m: u32, p: u32, ) -> Weight;
+	fn close_early_approved(b: u32, m: u32, p: u32, ) -> Weight;
+	fn close_disapproved(m: u32, p: u32, ) -> Weight;
+	fn close_approved(b: u32, m: u32, p: u32, ) -> Weight;
+	fn disapprove_proposal(p: u32, ) -> Weight;
 }
 
 pub trait Trait<I: Instance=DefaultInstance>: frame_system::Trait {

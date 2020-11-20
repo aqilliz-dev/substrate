@@ -17,139 +17,139 @@
 
 //! Substrate client possible errors.
 
-use std::{self, result};
+use std::{self, error, result};
 use sp_state_machine;
 use sp_runtime::transaction_validity::TransactionValidityError;
 use sp_consensus;
+use derive_more::{Display, From};
 use codec::Error as CodecError;
 
 /// Client Result type alias
 pub type Result<T> = result::Result<T, Error>;
 
 /// Error when the runtime failed to apply an extrinsic.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Display)]
 pub enum ApplyExtrinsicFailed {
 	/// The transaction cannot be included into the current block.
 	///
 	/// This doesn't necessary mean that the transaction itself is invalid, but it might be just
 	/// unappliable onto the current block.
-	#[error("Extrinsic is not valid: {0:?}")]
-	Validity(#[from] TransactionValidityError),
+	#[display(fmt = "Extrinsic is not valid: {:?}", _0)]
+	Validity(TransactionValidityError),
 	/// This is used for miscellaneous errors that can be represented by string and not handleable.
 	///
 	/// This will become obsolete with complete migration to v4 APIs.
-	#[error("Extrinsic failed: {0}")]
+	#[display(fmt = "Extrinsic failed: {:?}", _0)]
 	Msg(String),
 }
 
 /// Substrate Client error
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Display, From)]
 pub enum Error {
 	/// Consensus Error
-	#[error(transparent)]
-	Consensus(#[from] sp_consensus::Error),
+	#[display(fmt = "Consensus: {}", _0)]
+	Consensus(sp_consensus::Error),
 	/// Backend error.
-	#[error("Backend error: {0}")]
+	#[display(fmt = "Backend error: {}", _0)]
+	#[from(ignore)]
 	Backend(String),
 	/// Unknown block.
-	#[error("UnknownBlock: {0}")]
+	#[display(fmt = "UnknownBlock: {}", _0)]
+	#[from(ignore)]
 	UnknownBlock(String),
 	/// The `apply_extrinsic` is not valid due to the given `TransactionValidityError`.
-	#[error(transparent)]
-	ApplyExtrinsicFailed(#[from] ApplyExtrinsicFailed),
+	#[display(fmt = "{:?}", _0)]
+	ApplyExtrinsicFailed(ApplyExtrinsicFailed),
 	/// Execution error.
-	#[error("Execution failed: {0:?}")]
+	#[display(fmt = "Execution: {}", _0)]
 	Execution(Box<dyn sp_state_machine::Error>),
 	/// Blockchain error.
-	#[error("Blockchain")]
-	Blockchain(#[source] Box<Error>),
+	#[display(fmt = "Blockchain: {}", _0)]
+	Blockchain(Box<Error>),
 	/// Invalid authorities set received from the runtime.
-	#[error("Current state of blockchain has invalid authorities set")]
+	#[display(fmt = "Current state of blockchain has invalid authorities set")]
 	InvalidAuthoritiesSet,
 	/// Could not get runtime version.
-	#[error("Failed to get runtime version: {0}")]
+	#[display(fmt = "Failed to get runtime version: {}", _0)]
+	#[from(ignore)]
 	VersionInvalid(String),
 	/// Genesis config is invalid.
-	#[error("Genesis config provided is invalid")]
+	#[display(fmt = "Genesis config provided is invalid")]
 	GenesisInvalid,
 	/// Error decoding header justification.
-	#[error("error decoding justification for header")]
+	#[display(fmt = "error decoding justification for header")]
 	JustificationDecode,
 	/// Justification for header is correctly encoded, but invalid.
-	#[error("bad justification for header: {0}")]
+	#[display(fmt = "bad justification for header: {}", _0)]
+	#[from(ignore)]
 	BadJustification(String),
 	/// Not available on light client.
-	#[error("This method is not currently available when running in light client mode")]
+	#[display(fmt = "This method is not currently available when running in light client mode")]
 	NotAvailableOnLightClient,
 	/// Invalid remote CHT-based proof.
-	#[error("Remote node has responded with invalid header proof")]
+	#[display(fmt = "Remote node has responded with invalid header proof")]
 	InvalidCHTProof,
 	/// Remote fetch has been cancelled.
-	#[error("Remote data fetch has been cancelled")]
+	#[display(fmt = "Remote data fetch has been cancelled")]
 	RemoteFetchCancelled,
 	/// Remote fetch has been failed.
-	#[error("Remote data fetch has been failed")]
+	#[display(fmt = "Remote data fetch has been failed")]
 	RemoteFetchFailed,
 	/// Error decoding call result.
-	#[error("Error decoding call result of {0}")]
-	CallResultDecode(&'static str, #[source] CodecError),
+	#[display(fmt = "Error decoding call result of {}: {}", _0, _1)]
+	CallResultDecode(&'static str, CodecError),
 	/// Error converting a parameter between runtime and node.
-	#[error("Error converting `{0}` between runtime and node")]
+	#[display(fmt = "Error converting `{}` between runtime and node", _0)]
+	#[from(ignore)]
 	RuntimeParamConversion(String),
 	/// Changes tries are not supported.
-	#[error("Changes tries are not supported by the runtime")]
+	#[display(fmt = "Changes tries are not supported by the runtime")]
 	ChangesTriesNotSupported,
 	/// Error reading changes tries configuration.
-	#[error("Error reading changes tries configuration")]
+	#[display(fmt = "Error reading changes tries configuration")]
 	ErrorReadingChangesTriesConfig,
 	/// Key changes query has failed.
-	#[error("Failed to check changes proof: {0}")]
+	#[display(fmt = "Failed to check changes proof: {}", _0)]
+	#[from(ignore)]
 	ChangesTrieAccessFailed(String),
 	/// Last finalized block not parent of current.
-	#[error("Did not finalize blocks in sequential order.")]
+	#[display(fmt = "Did not finalize blocks in sequential order.")]
+	#[from(ignore)]
 	NonSequentialFinalization(String),
 	/// Safety violation: new best block not descendent of last finalized.
-	#[error("Potential long-range attack: block not in finalized chain.")]
+	#[display(fmt = "Potential long-range attack: block not in finalized chain.")]
 	NotInFinalizedChain,
 	/// Hash that is required for building CHT is missing.
-	#[error("Failed to get hash of block for building CHT")]
+	#[display(fmt = "Failed to get hash of block for building CHT")]
 	MissingHashRequiredForCHT,
 	/// Invalid calculated state root on block import.
-	#[error("Calculated state root does not match.")]
+	#[display(fmt = "Calculated state root does not match.")]
 	InvalidStateRoot,
 	/// Incomplete block import pipeline.
-	#[error("Incomplete block import pipeline.")]
+	#[display(fmt = "Incomplete block import pipeline.")]
 	IncompletePipeline,
-	#[error("Transaction pool not ready for block production.")]
+	#[display(fmt = "Transaction pool not ready for block production.")]
 	TransactionPoolNotReady,
-	#[error("Database")]
-	DatabaseError(#[from] sp_database::error::DatabaseError),
+	#[display(fmt = "Database: {}", _0)]
+	DatabaseError(sp_database::error::DatabaseError),
 	/// A convenience variant for String
-	#[error("{0}")]
+	#[display(fmt = "{}", _0)]
 	Msg(String),
+}
+
+impl error::Error for Error {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			Error::Consensus(e) => Some(e),
+			Error::Blockchain(e) => Some(e),
+			_ => None,
+		}
+	}
 }
 
 impl<'a> From<&'a str> for Error {
 	fn from(s: &'a str) -> Self {
 		Error::Msg(s.into())
-	}
-}
-
-impl From<String> for Error {
-	fn from(s: String) -> Self {
-		Error::Msg(s)
-	}
-}
-
-impl From<Box<dyn sp_state_machine::Error + Send + Sync>> for Error {
-	fn from(e: Box<dyn sp_state_machine::Error + Send + Sync>) -> Self {
-		Self::from_state(e)
-	}
-}
-
-impl From<Box<dyn sp_state_machine::Error>> for Error {
-	fn from(e: Box<dyn sp_state_machine::Error>) -> Self {
-		Self::from_state(e)
 	}
 }
 

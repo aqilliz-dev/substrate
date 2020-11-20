@@ -33,6 +33,7 @@
 //!
 
 use crate::Event;
+use super::maybe_utf8_bytes_to_string;
 
 use futures::{prelude::*, channel::mpsc, ready, stream::FusedStream};
 use parking_lot::Mutex;
@@ -227,23 +228,23 @@ impl Metrics {
 					.with_label_values(&["dht", "sent", name])
 					.inc_by(num);
 			}
-			Event::NotificationStreamOpened { protocol, .. } => {
+			Event::NotificationStreamOpened { engine_id, .. } => {
 				self.events_total
-					.with_label_values(&[&format!("notif-open-{:?}", protocol), "sent", name])
+					.with_label_values(&[&format!("notif-open-{:?}", engine_id), "sent", name])
 					.inc_by(num);
 			},
-			Event::NotificationStreamClosed { protocol, .. } => {
+			Event::NotificationStreamClosed { engine_id, .. } => {
 				self.events_total
-					.with_label_values(&[&format!("notif-closed-{:?}", protocol), "sent", name])
+					.with_label_values(&[&format!("notif-closed-{:?}", engine_id), "sent", name])
 					.inc_by(num);
 			},
 			Event::NotificationsReceived { messages, .. } => {
-				for (protocol, message) in messages {
+				for (engine_id, message) in messages {
 					self.events_total
-						.with_label_values(&[&format!("notif-{:?}", protocol), "sent", name])
+						.with_label_values(&[&format!("notif-{:?}", engine_id), "sent", name])
 						.inc_by(num);
 					self.notifications_sizes
-						.with_label_values(&[protocol, "sent", name])
+						.with_label_values(&[&maybe_utf8_bytes_to_string(engine_id), "sent", name])
 						.inc_by(num.saturating_mul(u64::try_from(message.len()).unwrap_or(u64::max_value())));
 				}
 			},
@@ -257,23 +258,23 @@ impl Metrics {
 					.with_label_values(&["dht", "received", name])
 					.inc();
 			}
-			Event::NotificationStreamOpened { protocol, .. } => {
+			Event::NotificationStreamOpened { engine_id, .. } => {
 				self.events_total
-					.with_label_values(&[&format!("notif-open-{:?}", protocol), "received", name])
+					.with_label_values(&[&format!("notif-open-{:?}", engine_id), "received", name])
 					.inc();
 			},
-			Event::NotificationStreamClosed { protocol, .. } => {
+			Event::NotificationStreamClosed { engine_id, .. } => {
 				self.events_total
-					.with_label_values(&[&format!("notif-closed-{:?}", protocol), "received", name])
+					.with_label_values(&[&format!("notif-closed-{:?}", engine_id), "received", name])
 					.inc();
 			},
 			Event::NotificationsReceived { messages, .. } => {
-				for (protocol, message) in messages {
+				for (engine_id, message) in messages {
 					self.events_total
-						.with_label_values(&[&format!("notif-{:?}", protocol), "received", name])
+						.with_label_values(&[&format!("notif-{:?}", engine_id), "received", name])
 						.inc();
 					self.notifications_sizes
-						.with_label_values(&[&protocol, "received", name])
+						.with_label_values(&[&maybe_utf8_bytes_to_string(engine_id), "received", name])
 						.inc_by(u64::try_from(message.len()).unwrap_or(u64::max_value()));
 				}
 			},

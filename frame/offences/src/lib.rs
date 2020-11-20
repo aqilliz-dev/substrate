@@ -168,7 +168,7 @@ where
 		let time_slot = offence.time_slot();
 		let validator_set_count = offence.validator_set_count();
 
-		// Go through all offenders in the offence report and find all offenders that were spotted
+		// Go through all offenders in the offence report and find all offenders that was spotted
 		// in unique reports.
 		let TriageOutcome { concurrent_offenders } = match Self::triage_offence_report::<O>(
 			reporters,

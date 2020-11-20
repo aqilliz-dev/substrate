@@ -29,28 +29,13 @@ pub fn transactional(_attr: TokenStream, input: TokenStream) -> Result<TokenStre
 		#vis #sig {
 			use #crate_::storage::{with_transaction, TransactionOutcome};
 			with_transaction(|| {
-				let r = (|| { #block })();
+				let r = #block;
 				if r.is_ok() {
 					TransactionOutcome::Commit(r)
 				} else {
 					TransactionOutcome::Rollback(r)
 				}
 			})
-		}
-	};
-
-	Ok(output.into())
-}
-
-pub fn require_transactional(_attr: TokenStream, input: TokenStream) -> Result<TokenStream> {
-	let ItemFn { attrs, vis, sig, block } = syn::parse(input)?;
-
-	let crate_ = generate_crate_access_2018()?;
-	let output = quote! {
-		#(#attrs)*
-		#vis #sig {
-			#crate_::storage::require_transaction();
-			#block
 		}
 	};
 

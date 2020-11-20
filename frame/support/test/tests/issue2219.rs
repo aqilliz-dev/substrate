@@ -166,7 +166,6 @@ impl system::Trait for Runtime {
 	type Event = Event;
 	type PalletInfo = ();
 	type Call = Call;
-	type DbWeight = ();
 }
 
 impl module::Trait for Runtime {}

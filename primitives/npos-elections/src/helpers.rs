@@ -17,9 +17,7 @@
 
 //! Helper methods for npos-elections.
 
-use crate::{
-	Assignment, ExtendedBalance, VoteWeight, IdentifierT, StakedAssignment, WithApprovalOf, Error,
-};
+use crate::{Assignment, ExtendedBalance, VoteWeight, IdentifierT, StakedAssignment, WithApprovalOf, Error};
 use sp_arithmetic::{PerThing, InnerOf};
 use sp_std::prelude::*;
 
@@ -27,7 +25,7 @@ use sp_std::prelude::*;
 ///
 /// Note that this will NOT attempt at normalizing the result.
 pub fn assignment_ratio_to_staked<A: IdentifierT, P: PerThing, FS>(
-	ratios: Vec<Assignment<A, P>>,
+	ratio: Vec<Assignment<A, P>>,
 	stake_of: FS,
 ) -> Vec<StakedAssignment<A>>
 where
@@ -35,7 +33,7 @@ where
 	P: sp_std::ops::Mul<ExtendedBalance, Output = ExtendedBalance>,
 	ExtendedBalance: From<InnerOf<P>>,
 {
-	ratios
+	ratio
 		.into_iter()
 		.map(|a| {
 			let stake = stake_of(&a.who);

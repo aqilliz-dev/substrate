@@ -20,24 +20,34 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-mod mock;
-mod tests;
-mod benchmarking;
-pub mod weights;
-
 use sp_std::prelude::*;
 use codec::Codec;
-use sp_runtime::MultiAddress;
 use sp_runtime::traits::{
 	StaticLookup, Member, LookupError, Zero, Saturating, AtLeast32Bit
 };
 use frame_support::{Parameter, decl_module, decl_error, decl_event, decl_storage, ensure};
 use frame_support::dispatch::DispatchResult;
 use frame_support::traits::{Currency, ReservableCurrency, Get, BalanceStatus::Reserved};
+use frame_support::weights::Weight;
 use frame_system::{ensure_signed, ensure_root};
-pub use weights::WeightInfo;
+use self::address::Address as RawAddress;
 
+mod mock;
+pub mod address;
+mod tests;
+mod benchmarking;
+mod default_weights;
+
+pub type Address<T> = RawAddress<<T as frame_system::Trait>::AccountId, <T as Trait>::AccountIndex>;
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::Balance;
+
+pub trait WeightInfo {
+	fn claim() -> Weight;
+	fn transfer() -> Weight;
+	fn free() -> Weight;
+	fn force_transfer() -> Weight;
+	fn freeze() -> Weight;
+}
 
 /// The module's config trait.
 pub trait Trait: frame_system::Trait {
@@ -78,11 +88,11 @@ decl_event!(
 		<T as frame_system::Trait>::AccountId,
 		<T as Trait>::AccountIndex
 	{
-		/// A account index was assigned. \[index, who\]
+		/// A account index was assigned. \[who, index\]
 		IndexAssigned(AccountId, AccountIndex),
 		/// A account index has been freed up (unassigned). \[index\]
 		IndexFreed(AccountIndex),
-		/// A account index has been frozen to its current account ID. \[index, who\]
+		/// A account index has been frozen to its current account ID. \[who, index\]
 		IndexFrozen(AccountIndex, AccountId),
 	}
 );
@@ -285,18 +295,17 @@ impl<T: Trait> Module<T> {
 
 	/// Lookup an address to get an Id, if there's one there.
 	pub fn lookup_address(
-		a: MultiAddress<T::AccountId, T::AccountIndex>
+		a: address::Address<T::AccountId, T::AccountIndex>
 	) -> Option<T::AccountId> {
 		match a {
-			MultiAddress::Id(i) => Some(i),
-			MultiAddress::Index(i) => Self::lookup_index(i),
-			_ => None,
+			address::Address::Id(i) => Some(i),
+			address::Address::Index(i) => Self::lookup_index(i),
 		}
 	}
 }
 
 impl<T: Trait> StaticLookup for Module<T> {
-	type Source = MultiAddress<T::AccountId, T::AccountIndex>;
+	type Source = address::Address<T::AccountId, T::AccountIndex>;
 	type Target = T::AccountId;
 
 	fn lookup(a: Self::Source) -> Result<Self::Target, LookupError> {
@@ -304,6 +313,6 @@ impl<T: Trait> StaticLookup for Module<T> {
 	}
 
 	fn unlookup(a: Self::Target) -> Self::Source {
-		MultiAddress::Id(a)
+		address::Address::Id(a)
 	}
 }

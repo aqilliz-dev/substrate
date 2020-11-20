@@ -34,9 +34,10 @@ use sp_consensus_babe::{
 use serde::{Deserialize, Serialize};
 use sp_core::{
 	crypto::Public,
+	traits::BareCryptoStore,
 };
 use sp_application_crypto::AppKey;
-use sp_keystore::{SyncCryptoStorePtr, SyncCryptoStore};
+use sc_keystore::KeyStorePtr;
 use sc_rpc_api::DenyUnsafe;
 use sp_api::{ProvideRuntimeApi, BlockId};
 use sp_runtime::traits::{Block as BlockT, Header as _};
@@ -62,7 +63,7 @@ pub struct BabeRpcHandler<B: BlockT, C, SC> {
 	/// shared reference to EpochChanges
 	shared_epoch_changes: SharedEpochChanges<B, Epoch>,
 	/// shared reference to the Keystore
-	keystore: SyncCryptoStorePtr,
+	keystore: KeyStorePtr,
 	/// config (actually holds the slot duration)
 	babe_config: Config,
 	/// The SelectChain strategy
@@ -76,7 +77,7 @@ impl<B: BlockT, C, SC> BabeRpcHandler<B, C, SC> {
 	pub fn new(
 		client: Arc<C>,
 		shared_epoch_changes: SharedEpochChanges<B, Epoch>,
-		keystore: SyncCryptoStorePtr,
+		keystore: KeyStorePtr,
 		babe_config: Config,
 		select_chain: SC,
 		deny_unsafe: DenyUnsafe,
@@ -130,10 +131,11 @@ impl<B, C, SC> BabeApi for BabeRpcHandler<B, C, SC>
 			let mut claims: HashMap<AuthorityId, EpochAuthorship> = HashMap::new();
 
 			let keys = {
+				let ks = keystore.read();
 				epoch.authorities.iter()
 					.enumerate()
 					.filter_map(|(i, a)| {
-						if SyncCryptoStore::has_keys(&*keystore, &[(a.0.to_raw_vec(), AuthorityId::ID)]) {
+						if ks.has_keys(&[(a.0.to_raw_vec(), AuthorityId::ID)]) {
 							Some((a.0.clone(), i))
 						} else {
 							None
@@ -234,23 +236,18 @@ mod tests {
 		TestClientBuilder,
 	};
 	use sp_application_crypto::AppPair;
-	use sp_keyring::Sr25519Keyring;
-	use sp_core::{crypto::key_types::BABE};
-	use sp_keystore::{SyncCryptoStorePtr, SyncCryptoStore};
-	use sc_keystore::LocalKeystore;
+	use sp_keyring::Ed25519Keyring;
+	use sc_keystore::Store;
 
 	use std::sync::Arc;
 	use sc_consensus_babe::{Config, block_import, AuthorityPair};
 	use jsonrpc_core::IoHandler;
 
 	/// creates keystore backed by a temp file
-	fn create_temp_keystore<P: AppPair>(
-		authority: Sr25519Keyring,
-	) -> (SyncCryptoStorePtr, tempfile::TempDir) {
+	fn create_temp_keystore<P: AppPair>(authority: Ed25519Keyring) -> (KeyStorePtr, tempfile::TempDir) {
 		let keystore_path = tempfile::tempdir().expect("Creates keystore path");
-		let keystore = Arc::new(LocalKeystore::open(keystore_path.path(), None)
-			.expect("Creates keystore"));
-		SyncCryptoStore::sr25519_generate_new(&*keystore, BABE, Some(&authority.to_seed()))
+		let keystore = Store::open(keystore_path.path(), None).expect("Creates keystore");
+		keystore.write().insert_ephemeral_from_seed::<P>(&authority.to_seed())
 			.expect("Creates authority key");
 
 		(keystore, keystore_path)
@@ -270,7 +267,7 @@ mod tests {
 		).expect("can initialize block-import");
 
 		let epoch_changes = link.epoch_changes().clone();
-		let keystore = create_temp_keystore::<AuthorityPair>(Sr25519Keyring::Alice).0;
+		let keystore = create_temp_keystore::<AuthorityPair>(Ed25519Keyring::Alice).0;
 
 		BabeRpcHandler::new(
 			client.clone(),

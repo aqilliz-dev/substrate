@@ -60,17 +60,13 @@ pub struct BenchmarkCmd {
 	#[structopt(long)]
 	pub no_min_squares: bool,
 
-	/// Output the benchmarks to a Rust file at the given path.
+	/// Output the benchmarks to a Rust file.
 	#[structopt(long)]
-	pub output: Option<std::path::PathBuf>,
+	pub output: bool,
 
-	/// Add a header file to your outputted benchmarks
+	/// Output the trait definition to a Rust file.
 	#[structopt(long)]
-	pub header: Option<std::path::PathBuf>,
-
-	/// Path to Handlebars template file used for outputting benchmark results. (Optional)
-	#[structopt(long)]
-	pub template: Option<std::path::PathBuf>,
+	pub weight_trait: bool,
 
 	/// Set the heap pages while running benchmarks.
 	#[structopt(long)]

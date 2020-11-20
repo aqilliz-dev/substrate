@@ -46,8 +46,7 @@ use std::{sync::Arc, format};
 
 /// An error that can occur within the inherent data system.
 #[cfg(feature = "std")]
-#[derive(Debug, Encode, Decode, thiserror::Error)]
-#[error("Inherents: {0}")]
+#[derive(Debug, Encode, Decode, derive_more::Display)]
 pub struct Error(String);
 
 #[cfg(feature = "std")]

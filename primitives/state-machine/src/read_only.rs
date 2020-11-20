@@ -37,13 +37,11 @@ pub trait InspectState<H: Hasher, B: Backend<H>> {
 	///
 	/// Self will be set as read-only externalities and inspection
 	/// closure will be run against it.
-	///
-	/// Returns the result of the closure.
-	fn inspect_state<F: FnOnce() -> R, R>(&self, f: F) -> R;
+	fn inspect_with<F: FnOnce()>(&self, f: F);
 }
 
 impl<H: Hasher, B: Backend<H>> InspectState<H, B> for B {
-	fn inspect_state<F: FnOnce() -> R, R>(&self, f: F) -> R {
+	fn inspect_with<F: FnOnce()>(&self, f: F) {
 		ReadOnlyExternalities::from(self).execute_with(f)
 	}
 }

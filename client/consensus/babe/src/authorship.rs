@@ -28,13 +28,13 @@ use sp_consensus_babe::digests::{
 	PreDigest, PrimaryPreDigest, SecondaryPlainPreDigest, SecondaryVRFPreDigest,
 };
 use sp_consensus_vrf::schnorrkel::{VRFOutput, VRFProof};
-use sp_core::{U256, blake2_256, crypto::Public};
-use sp_keystore::{SyncCryptoStorePtr, SyncCryptoStore};
+use sp_core::{U256, blake2_256, crypto::Public, traits::BareCryptoStore};
 use codec::Encode;
 use schnorrkel::{
 	keys::PublicKey,
 	vrf::VRFInOut,
 };
+use sc_keystore::KeyStorePtr;
 use super::Epoch;
 
 /// Calculates the primary selection threshold for a given authority, taking
@@ -131,7 +131,7 @@ fn claim_secondary_slot(
 	slot_number: SlotNumber,
 	epoch: &Epoch,
 	keys: &[(AuthorityId, usize)],
-	keystore: &SyncCryptoStorePtr,
+	keystore: &KeyStorePtr,
 	author_secondary_vrf: bool,
 ) -> Option<(PreDigest, AuthorityId)> {
 	let Epoch { authorities, randomness, epoch_index, .. } = epoch;
@@ -154,8 +154,7 @@ fn claim_secondary_slot(
 					slot_number,
 					*epoch_index,
 				);
-				let result = SyncCryptoStore::sr25519_vrf_sign(
-					&**keystore,
+				let result = keystore.read().sr25519_vrf_sign(
 					AuthorityId::ID,
 					authority_id.as_ref(),
 					transcript_data,
@@ -170,7 +169,7 @@ fn claim_secondary_slot(
 				} else {
 					None
 				}
-			} else if SyncCryptoStore::has_keys(&**keystore, &[(authority_id.to_raw_vec(), AuthorityId::ID)]) {
+			} else if keystore.read().has_keys(&[(authority_id.to_raw_vec(), AuthorityId::ID)]) {
 				Some(PreDigest::SecondaryPlain(SecondaryPlainPreDigest {
 					slot_number,
 					authority_index: *authority_index as u32,
@@ -195,7 +194,7 @@ fn claim_secondary_slot(
 pub fn claim_slot(
 	slot_number: SlotNumber,
 	epoch: &Epoch,
-	keystore: &SyncCryptoStorePtr,
+	keystore: &KeyStorePtr,
 ) -> Option<(PreDigest, AuthorityId)> {
 	let authorities = epoch.authorities.iter()
 		.enumerate()
@@ -209,7 +208,7 @@ pub fn claim_slot(
 pub fn claim_slot_using_keys(
 	slot_number: SlotNumber,
 	epoch: &Epoch,
-	keystore: &SyncCryptoStorePtr,
+	keystore: &KeyStorePtr,
 	keys: &[(AuthorityId, usize)],
 ) -> Option<(PreDigest, AuthorityId)> {
 	claim_primary_slot(slot_number, epoch, epoch.config.c, keystore, &keys)
@@ -221,7 +220,7 @@ pub fn claim_slot_using_keys(
 					slot_number,
 					&epoch,
 					keys,
-					&keystore,
+					keystore,
 					epoch.config.allowed_slots.is_secondary_vrf_slots_allowed(),
 				)
 			} else {
@@ -238,7 +237,7 @@ fn claim_primary_slot(
 	slot_number: SlotNumber,
 	epoch: &Epoch,
 	c: (u64, u64),
-	keystore: &SyncCryptoStorePtr,
+	keystore: &KeyStorePtr,
 	keys: &[(AuthorityId, usize)],
 ) -> Option<(PreDigest, AuthorityId)> {
 	let Epoch { authorities, randomness, epoch_index, .. } = epoch;
@@ -260,8 +259,7 @@ fn claim_primary_slot(
 		// be empty.  Therefore, this division in `calculate_threshold` is safe.
 		let threshold = super::authorship::calculate_primary_threshold(c, authorities, *authority_index);
 
-		let result = SyncCryptoStore::sr25519_vrf_sign(
-			&**keystore,
+		let result = keystore.read().sr25519_vrf_sign(
 			AuthorityId::ID,
 			authority_id.as_ref(),
 			transcript_data,
@@ -291,19 +289,16 @@ fn claim_primary_slot(
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use std::sync::Arc;
 	use sp_core::{sr25519::Pair, crypto::Pair as _};
 	use sp_consensus_babe::{AuthorityId, BabeEpochConfiguration, AllowedSlots};
-	use sc_keystore::LocalKeystore;
 
 	#[test]
 	fn claim_secondary_plain_slot_works() {
-		let keystore: SyncCryptoStorePtr = Arc::new(LocalKeystore::in_memory());
-		let valid_public_key = SyncCryptoStore::sr25519_generate_new(
-			&*keystore,
+		let keystore = sc_keystore::Store::new_in_memory();
+		let valid_public_key = dbg!(keystore.write().sr25519_generate_new(
 			AuthorityId::ID,
 			Some(sp_core::crypto::DEV_PHRASE),
-		).unwrap();
+		).unwrap());
 
 		let authorities = vec![
 			(AuthorityId::from(Pair::generate().0.public()), 5),

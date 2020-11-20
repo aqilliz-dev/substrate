@@ -18,71 +18,42 @@
 
 //! Initialization errors.
 
-use sp_core::crypto;
+
 
 /// Result type alias for the CLI.
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Error type for the CLI.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, derive_more::Display, derive_more::From)]
 pub enum Error {
 	/// Io error
-	#[error(transparent)]
-	Io(#[from] std::io::Error),
+	Io(std::io::Error),
 	/// Cli error
-	#[error(transparent)]
-	Cli(#[from] structopt::clap::Error),
+	Cli(structopt::clap::Error),
 	/// Service error
-	#[error(transparent)]
-	Service(#[from] sc_service::Error),
+	Service(sc_service::Error),
 	/// Client error
-	#[error(transparent)]
-	Client(#[from] sp_blockchain::Error),
+	Client(sp_blockchain::Error),
 	/// scale codec error
-	#[error(transparent)]
-	Codec(#[from] parity_scale_codec::Error),
+	Codec(parity_scale_codec::Error),
 	/// Input error
-	#[error("Invalid input: {0}")]
+	#[from(ignore)]
 	Input(String),
 	/// Invalid listen multiaddress
-	#[error("Invalid listen multiaddress")]
+	#[display(fmt="Invalid listen multiaddress")]
+	#[from(ignore)]
 	InvalidListenMultiaddress,
-	/// Application specific error chain sequence forwarder.
-	#[error(transparent)]
-	Application(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
-	/// URI error.
-	#[error("Invalid URI; expecting either a secret URI or a public URI.")]
-	InvalidUri(crypto::PublicError),
-	/// Signature length mismatch.
-	#[error("Signature has an invalid length. Read {read} bytes, expected {expected} bytes")]
-	SignatureInvalidLength {
-		/// Amount of signature bytes read.
-		read: usize,
-		/// Expected number of signature bytes.
-		expected: usize,
-	},
-	/// Missing base path argument.
-	#[error("The base path is missing, please provide one")]
-	MissingBasePath,
-	/// Unknown key type specifier or missing key type specifier.
-	#[error("Unknown key type, must be a known 4-character sequence")]
-	KeyTypeInvalid,
-	/// Signature verification failed.
-	#[error("Signature verification failed")]
-	SignatureInvalid,
-	/// Storing a given key failed.
-	#[error("Key store operation failed")]
-	KeyStoreOperation,
-	/// An issue with the underlying key storage was encountered.
-	#[error("Key storage issue encountered")]
-	KeyStorage(#[from] sc_keystore::Error),
-	/// Bytes are not decodable when interpreted as hexadecimal string.
-	#[error("Invalid hex base data")]
-	HexDataConversion(#[from] hex::FromHexError),
-	/// Shortcut type to specify types on the fly, discouraged.
-	#[deprecated = "Use `Forwarded` with an error type instead."]
-	#[error("Other: {0}")]
+	/// Other uncategorized error.
+	#[from(ignore)]
 	Other(String),
+}
+
+/// Must be implemented explicitly because `derive_more` won't generate this
+/// case due to conflicting derive for `Other(String)`.
+impl std::convert::From<String> for Error {
+	fn from(s: String) -> Error {
+		Error::Input(s)
+	}
 }
 
 impl std::convert::From<&str> for Error {
@@ -91,14 +62,17 @@ impl std::convert::From<&str> for Error {
 	}
 }
 
-impl std::convert::From<String> for Error {
-	fn from(s: String) -> Error {
-		Error::Input(s.to_string())
-	}
-}
-
-impl std::convert::From<crypto::PublicError> for Error {
-	fn from(e: crypto::PublicError) -> Error {
-		Error::InvalidUri(e)
+impl std::error::Error for Error {
+	fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+		match self {
+			Error::Io(ref err) => Some(err),
+			Error::Cli(ref err) => Some(err),
+			Error::Service(ref err) => Some(err),
+			Error::Client(ref err) => Some(err),
+			Error::Codec(ref err) => Some(err),
+			Error::Input(_) => None,
+			Error::InvalidListenMultiaddress => None,
+			Error::Other(_) => None,
+		}
 	}
 }

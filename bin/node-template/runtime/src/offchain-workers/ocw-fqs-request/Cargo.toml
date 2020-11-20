@@ -1,0 +1,37 @@
+[package]
+name = "ocw-fqs-request"
+version = "2.0.0"
+authors = ["Ignacio Palacios"]
+edition = "2018"
+license = "Unlicense"
+homepage = "https://substrate.dev"
+repository = "https://github.com/paritytech/substrate/"
+description = "OCW to request results to FQS"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+parity-scale-codec = { default-features = false, features = ['derive'], version = '1.3.0' }
+serde_json = { version = "1", default-features = false, git = "https://github.com/Xanewok/json", branch = "no-std", features = ["alloc"] }
+alt_serde = { version = "1", default-features = false, features = ["derive"] }
+parking_lot = "0.10.0"
+
+frame-support = { version = "2.0.0", default-features = false, path = "../../../../../../frame/support" }
+frame-system = { version = "2.0.0", default-features = false, path = "../../../../../../frame/system" }
+sp-core = { version = "2.0.0", default-features = false, path = "../../../../../../primitives/core" }
+sp-io = { version = "2.0.0", default-features = false, path = "../../../../../../primitives/io" }
+sp-runtime = { version = "2.0.0", default-features = false, path = "../../../../../../primitives/runtime" }
+sp-std = { version = "2.0.0", default-features = false, path = "../../../../../../primitives/std" }
+
+[features]
+default = ["std"]
+std = [
+	'parity-scale-codec/std',
+	"frame-support/std",
+	"frame-system/std",
+	"sp-core/std",
+	"sp-io/std",
+	"sp-runtime/std",
+	"sp-std/std",
+]

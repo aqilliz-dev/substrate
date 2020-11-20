@@ -100,14 +100,6 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-#[cfg(test)]
-mod mock;
-#[cfg(test)]
-mod tests;
-#[cfg(feature = "historical")]
-pub mod historical;
-pub mod weights;
-
 use sp_std::{prelude::*, marker::PhantomData, ops::{Sub, Rem}};
 use codec::Decode;
 use sp_runtime::{KeyTypeId, Perbill, RuntimeAppPublic, BoundToRuntimeAppPublic};
@@ -122,7 +114,16 @@ use frame_support::{
 	weights::Weight,
 };
 use frame_system::ensure_signed;
-pub use weights::WeightInfo;
+
+#[cfg(test)]
+mod mock;
+#[cfg(test)]
+mod tests;
+
+#[cfg(feature = "historical")]
+pub mod historical;
+
+mod default_weights;
 
 /// Decides whether the session should be ended.
 pub trait ShouldEndSession<BlockNumber> {
@@ -350,6 +351,11 @@ impl<T: Trait> ValidatorRegistration<T::ValidatorId> for Module<T> {
 	fn is_registered(id: &T::ValidatorId) -> bool {
 		Self::load_keys(id).is_some()
 	}
+}
+
+pub trait WeightInfo {
+	fn set_keys() -> Weight;
+	fn purge_keys() -> Weight;
 }
 
 pub trait Trait: frame_system::Trait {

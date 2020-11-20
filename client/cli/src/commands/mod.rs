@@ -16,6 +16,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 mod build_spec_cmd;
+mod build_sync_spec_cmd;
 mod check_block_cmd;
 mod export_blocks_cmd;
 mod export_state_cmd;
@@ -30,12 +31,13 @@ mod generate_node_key;
 mod generate;
 mod insert;
 mod inspect_node_key;
-mod inspect_key;
+mod inspect;
 mod key;
 pub mod utils;
 
 pub use self::{
 	build_spec_cmd::BuildSpecCmd,
+	build_sync_spec_cmd::BuildSyncSpecCmd,
 	check_block_cmd::CheckBlockCmd,
 	export_blocks_cmd::ExportBlocksCmd,
 	export_state_cmd::ExportStateCmd,
@@ -44,7 +46,7 @@ pub use self::{
 	sign::SignCmd,
 	generate::GenerateCmd,
 	insert::InsertCmd,
-	inspect_key::InspectKeyCmd,
+	inspect::InspectKeyCmd,
 	generate_node_key::GenerateNodeKeyCmd,
 	inspect_node_key::InspectNodeKeyCmd,
 	key::KeySubcommand,

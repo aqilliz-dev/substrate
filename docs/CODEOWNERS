@@ -43,7 +43,7 @@
 /primitives/consensus/pow/ @sorpaas
 
 # Contracts
-/frame/contracts/ @athei
+/frame/contracts/ @pepyakin
 
 # EVM
 /frame/evm/ @sorpaas

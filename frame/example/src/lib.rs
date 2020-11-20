@@ -15,7 +15,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! <!-- markdown-link-check-disable -->
 //! # Example Pallet
 //!
 //! <!-- Original author of paragraph: @gavofyork -->
@@ -257,7 +256,7 @@
 
 use sp_std::marker::PhantomData;
 use frame_support::{
-	dispatch::DispatchResult, decl_module, decl_storage, decl_event, traits::IsSubType,
+	dispatch::{DispatchResult, IsSubType}, decl_module, decl_storage, decl_event,
 	weights::{DispatchClass, ClassifyDispatch, WeighData, Weight, PaysFee, Pays},
 };
 use sp_std::prelude::*;

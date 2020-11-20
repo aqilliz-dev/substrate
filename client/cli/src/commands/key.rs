@@ -22,7 +22,7 @@ use structopt::StructOpt;
 
 use super::{
 	insert::InsertCmd,
-	inspect_key::InspectKeyCmd,
+	inspect::InspectKeyCmd,
 	generate::GenerateCmd,
 	inspect_node_key::InspectNodeKeyCmd,
 	generate_node_key::GenerateNodeKeyCmd,

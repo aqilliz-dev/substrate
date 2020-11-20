@@ -26,7 +26,7 @@ use sc_network_test::{
 	TestClient, TestNetFactory, FullPeerConfig,
 };
 use sc_network::config::{ProtocolConfig, BoxFinalityProofRequestBuilder};
-use parking_lot::{RwLock, Mutex};
+use parking_lot::Mutex;
 use futures_timer::Delay;
 use tokio::runtime::{Runtime, Handle};
 use sp_keyring::Ed25519Keyring;
@@ -43,7 +43,6 @@ use parity_scale_codec::Decode;
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT, HashFor};
 use sp_runtime::generic::{BlockId, DigestItem};
 use sp_core::{H256, crypto::Public};
-use sp_keystore::{SyncCryptoStorePtr, SyncCryptoStore};
 use sp_finality_grandpa::{GRANDPA_ENGINE_ID, AuthorityList, EquivocationProof, GrandpaApi, OpaqueKeyOwnershipProof};
 use sp_state_machine::{InMemoryBackend, prove_read, read_proof_check};
 
@@ -54,8 +53,6 @@ use finality_proof::{
 use consensus_changes::ConsensusChanges;
 use sc_block_builder::BlockBuilderProvider;
 use sc_consensus::LongestChain;
-use sc_keystore::LocalKeystore;
-use sp_application_crypto::key_types::GRANDPA;
 
 type TestLinkHalf =
 	LinkHalf<Block, PeersFullClient, LongestChain<substrate_test_runtime_client::Backend, Block>>;
@@ -99,7 +96,9 @@ impl TestNetFactory for GrandpaTestNet {
 
 	fn add_full_peer(&mut self) {
 		self.add_full_peer_with_config(FullPeerConfig {
-			notifications_protocols: vec![communication::GRANDPA_PROTOCOL_NAME.into()],
+			notifications_protocols: vec![
+				(communication::GRANDPA_ENGINE_ID, communication::GRANDPA_PROTOCOL_NAME.into())
+			],
 			..Default::default()
 		})
 	}
@@ -286,11 +285,10 @@ fn make_ids(keys: &[Ed25519Keyring]) -> AuthorityList {
 	keys.iter().map(|key| key.clone().public().into()).map(|id| (id, 1)).collect()
 }
 
-fn create_keystore(authority: Ed25519Keyring) -> (SyncCryptoStorePtr, tempfile::TempDir) {
+fn create_keystore(authority: Ed25519Keyring) -> (BareCryptoStorePtr, tempfile::TempDir) {
 	let keystore_path = tempfile::tempdir().expect("Creates keystore path");
-	let keystore = Arc::new(LocalKeystore::open(keystore_path.path(), None)
-		.expect("Creates keystore"));
-	SyncCryptoStore::ed25519_generate_new(&*keystore, GRANDPA, Some(&authority.to_seed()))
+	let keystore = sc_keystore::Store::open(keystore_path.path(), None).expect("Creates keystore");
+	keystore.write().insert_ephemeral_from_seed::<AuthorityPair>(&authority.to_seed())
 		.expect("Creates authority key");
 
 	(keystore, keystore_path)
@@ -369,6 +367,7 @@ fn run_to_completion_with<F>(
 			},
 			link: link,
 			network: net_service,
+			inherent_data_providers: InherentDataProviders::new(),
 			telemetry_on_connect: None,
 			voting_rule: (),
 			prometheus_registry: None,
@@ -500,6 +499,7 @@ fn finalize_3_voters_1_full_observer() {
 			},
 			link: link,
 			network: net_service,
+			inherent_data_providers: InherentDataProviders::new(),
 			telemetry_on_connect: None,
 			voting_rule: (),
 			prometheus_registry: None,
@@ -663,6 +663,7 @@ fn transition_3_voters_twice_1_full_observer() {
 			},
 			link: link,
 			network: net_service,
+			inherent_data_providers: InherentDataProviders::new(),
 			telemetry_on_connect: None,
 			voting_rule: (),
 			prometheus_registry: None,
@@ -1052,7 +1053,7 @@ fn voter_persists_its_votes() {
 			voter_rx: TracingUnboundedReceiver<()>,
 			net: Arc<Mutex<GrandpaTestNet>>,
 			client: PeersClient,
-			keystore: SyncCryptoStorePtr,
+			keystore: BareCryptoStorePtr,
 		}
 
 		impl Future for ResettableVoter {
@@ -1087,6 +1088,7 @@ fn voter_persists_its_votes() {
 							},
 							link,
 							network: this.net.lock().peers[0].network_service().clone(),
+							inherent_data_providers: InherentDataProviders::new(),
 							telemetry_on_connect: None,
 							voting_rule: VotingRulesBuilder::default().build(),
 							prometheus_registry: None,
@@ -1432,6 +1434,7 @@ fn voter_catches_up_to_latest_round_when_behind() {
 			},
 			link,
 			network: net.lock().peer(peer_id).network_service().clone(),
+			inherent_data_providers: InherentDataProviders::new(),
 			telemetry_on_connect: None,
 			voting_rule: (),
 			prometheus_registry: None,
@@ -1530,7 +1533,7 @@ type TestEnvironment<N, VR> = Environment<
 
 fn test_environment<N, VR>(
 	link: &TestLinkHalf,
-	keystore: Option<SyncCryptoStorePtr>,
+	keystore: Option<BareCryptoStorePtr>,
 	network_service: N,
 	voting_rule: VR,
 ) -> TestEnvironment<N, VR>
@@ -1711,10 +1714,6 @@ fn grandpa_environment_never_overwrites_round_voter_state() {
 
 	assert_eq!(get_current_round(2).unwrap(), HasVoted::No);
 
-	// we need to call `round_data` for the next round to pick up
-	// from the keystore which authority id we'll be using to vote
-	environment.round_data(2);
-
 	let info = peer.client().info();
 
 	let prevote = finality_grandpa::Prevote {
@@ -1814,56 +1813,4 @@ fn imports_justification_for_regular_blocks_on_import() {
 	assert!(
 		client.justification(&BlockId::Hash(block_hash)).unwrap().is_some(),
 	);
-}
-
-#[test]
-fn grandpa_environment_doesnt_send_equivocation_reports_for_itself() {
-	use finality_grandpa::voter::Environment;
-
-	let alice = Ed25519Keyring::Alice;
-	let voters = make_ids(&[alice]);
-
-	let environment = {
-		let mut net = GrandpaTestNet::new(TestApi::new(voters), 1);
-		let peer = net.peer(0);
-		let network_service = peer.network_service().clone();
-		let link = peer.data.lock().take().unwrap();
-		let (keystore, _keystore_path) = create_keystore(alice);
-		test_environment(&link, Some(keystore), network_service.clone(), ())
-	};
-
-	let signed_prevote = {
-		let prevote = finality_grandpa::Prevote {
-			target_hash: H256::random(),
-			target_number: 1,
-		};
-
-		let signed = alice.sign(&[]).into();
-		(prevote, signed)
-	};
-
-	let mut equivocation = finality_grandpa::Equivocation {
-		round_number: 1,
-		identity: alice.public().into(),
-		first: signed_prevote.clone(),
-		second: signed_prevote.clone(),
-	};
-
-	// we need to call `round_data` to pick up from the keystore which
-	// authority id we'll be using to vote
-	environment.round_data(1);
-
-	// reporting the equivocation should fail since the offender is a local
-	// authority (i.e. we have keys in our keystore for the given id)
-	let equivocation_proof = sp_finality_grandpa::Equivocation::Prevote(equivocation.clone());
-	assert!(matches!(
-		environment.report_equivocation(equivocation_proof),
-		Err(Error::Safety(_))
-	));
-
-	// if we set the equivocation offender to another id for which we don't have
-	// keys it should work
-	equivocation.identity = Default::default();
-	let equivocation_proof = sp_finality_grandpa::Equivocation::Prevote(equivocation);
-	assert!(environment.report_equivocation(equivocation_proof).is_ok());
 }

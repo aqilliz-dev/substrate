@@ -701,12 +701,11 @@ mod tests {
 	use crate::{decl_module, parameter_types, traits::Get};
 	use super::*;
 
-	pub trait Trait: 'static {
+	pub trait Trait {
 		type Origin;
 		type Balance;
 		type BlockNumber;
 		type DbWeight: Get<RuntimeDbWeight>;
-		type PalletInfo: crate::traits::PalletInfo;
 	}
 
 	pub struct TraitImpl {}
@@ -723,11 +722,10 @@ mod tests {
 		type BlockNumber = u32;
 		type Balance = u32;
 		type DbWeight = DbWeight;
-		type PalletInfo = ();
 	}
 
 	decl_module! {
-		pub struct Module<T: Trait> for enum Call where origin: T::Origin, system=self {
+		pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 			// no arguments, fixed weight
 			#[weight = 1000]
 			fn f00(_origin) { unimplemented!(); }

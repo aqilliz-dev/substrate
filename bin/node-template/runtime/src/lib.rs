@@ -7,13 +7,13 @@
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 use sp_std::prelude::*;
-use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
+use sp_core::{crypto::KeyTypeId, OpaqueMetadata, Encode};
 use sp_runtime::{
 	ApplyExtrinsicResult, generic, create_runtime_str, impl_opaque_keys, MultiSignature,
 	transaction_validity::{TransactionValidity, TransactionSource},
 };
 use sp_runtime::traits::{
-	BlakeTwo256, Block as BlockT, AccountIdLookup, Verify, IdentifyAccount, NumberFor, Saturating,
+	BlakeTwo256, Block as BlockT, IdentityLookup, Verify, IdentifyAccount, NumberFor, Saturating, SaturatedConversion
 };
 use sp_api::impl_runtime_apis;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
@@ -22,6 +22,7 @@ use pallet_grandpa::fg_primitives;
 use sp_version::RuntimeVersion;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
+use pallet_contracts_rpc_runtime_api::ContractExecResult;
 
 // A few exports that help ease life for downstream crates.
 #[cfg(any(feature = "std", test))]
@@ -30,17 +31,23 @@ pub use pallet_timestamp::Call as TimestampCall;
 pub use pallet_balances::Call as BalancesCall;
 pub use sp_runtime::{Permill, Perbill};
 pub use frame_support::{
-	construct_runtime, parameter_types, StorageValue,
+	construct_runtime, parameter_types, StorageValue, debug,
 	traits::{KeyOwnerProofSystem, Randomness},
 	weights::{
-		Weight, IdentityFee,
-		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
+		Weight, IdentityFee, RuntimeDbWeight,
+		// constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
+		constants::{WEIGHT_PER_SECOND, WEIGHT_PER_MILLIS, WEIGHT_PER_MICROS},
 	},
 };
-use pallet_transaction_payment::CurrencyAdapter;
+
+mod weights;
 
 /// Import the template pallet.
 pub use template;
+
+pub use provenance_ledger;
+
+pub use ocw_fqs_request;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -96,18 +103,12 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("node-template"),
 	impl_name: create_runtime_str!("node-template"),
 	authoring_version: 1,
-	spec_version: 1,
+	spec_version: 2,
 	impl_version: 1,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
 };
 
-/// This determines the average expected block time that we are targetting.
-/// Blocks will be produced at a minimum duration defined by `SLOT_DURATION`.
-/// `SLOT_DURATION` is picked up by `pallet_timestamp` which is in turn picked
-/// up by `pallet_aura` to implement `fn slot_duration()`.
-///
-/// Change this to adjust the block time.
 pub const MILLISECS_PER_BLOCK: u64 = 6000;
 
 pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
@@ -116,6 +117,11 @@ pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
 pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
 pub const HOURS: BlockNumber = MINUTES * 60;
 pub const DAYS: BlockNumber = HOURS * 24;
+
+// Contracts price units.
+pub const MILLICENTS: Balance = 1_000_000_000;
+pub const CENTS: Balance = 1_000 * MILLICENTS;
+pub const DOLLARS: Balance = 100 * CENTS;
 
 /// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
@@ -138,6 +144,19 @@ parameter_types! {
 	pub const Version: RuntimeVersion = VERSION;
 }
 
+parameter_types! {
+	/// Importing a block with 0 txs takes ~5 ms
+	pub const BlockExecutionWeight: Weight = 11 * WEIGHT_PER_MILLIS;
+	/// Executing 10,000 System remarks (no-op) txs takes ~1.26 seconds -> ~125 µs per tx
+	pub const ExtrinsicBaseWeight: Weight = 300 * WEIGHT_PER_MICROS;
+	/// By default, Substrate uses RocksDB, so this will be the weight used throughout
+	/// the runtime.
+	pub const RocksDbWeight: RuntimeDbWeight = RuntimeDbWeight {
+		read: 42 * WEIGHT_PER_MICROS,   // ~25 µs @ 200,000 items
+		write: 170 * WEIGHT_PER_MICROS, // ~100 µs @ 200,000 items
+	};
+}
+
 // Configure FRAME pallets to include in runtime.
 
 impl frame_system::Trait for Runtime {
@@ -148,7 +167,7 @@ impl frame_system::Trait for Runtime {
 	/// The aggregated dispatch type that is available for extrinsics.
 	type Call = Call;
 	/// The lookup mechanism to get account ID from whatever is passed in dispatchers.
-	type Lookup = AccountIdLookup<AccountId, ()>;
+	type Lookup = IdentityLookup<AccountId>;
 	/// The index type for storing how many extrinsics an account has signed.
 	type Index = Index;
 	/// The index type for blocks.
@@ -235,7 +254,7 @@ impl pallet_timestamp::Trait for Runtime {
 }
 
 parameter_types! {
-	pub const ExistentialDeposit: u128 = 500;
+	pub const ExistentialDeposit: u128 = 1;
 	pub const MaxLocks: u32 = 50;
 }
 
@@ -248,7 +267,7 @@ impl pallet_balances::Trait for Runtime {
 	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
 	type AccountStore = System;
-	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 }
 
 parameter_types! {
@@ -256,7 +275,8 @@ parameter_types! {
 }
 
 impl pallet_transaction_payment::Trait for Runtime {
-	type OnChargeTransaction = CurrencyAdapter<Balances, ()>;
+	type Currency = Balances;
+	type OnTransactionPayment = ();
 	type TransactionByteFee = TransactionByteFee;
 	type WeightToFee = IdentityFee<Balance>;
 	type FeeMultiplierUpdate = ();
@@ -271,6 +291,120 @@ impl pallet_sudo::Trait for Runtime {
 impl template::Trait for Runtime {
 	type Event = Event;
 }
+
+impl provenance_ledger::Trait for Runtime {
+	type Event = Event;
+	type WeightInfo = weights::provenance_ledger::WeightInfo;
+}
+
+parameter_types! {
+    pub const TombstoneDeposit: Balance = 16 * MILLICENTS;
+    pub const RentByteFee: Balance = 4 * MILLICENTS;
+    pub const RentDepositOffset: Balance = 1000 * MILLICENTS;
+    pub const SurchargeReward: Balance = 150 * MILLICENTS;
+}
+
+impl pallet_contracts::Trait for Runtime {
+    type Time = Timestamp;
+    type Randomness = RandomnessCollectiveFlip;
+    type Currency = Balances;
+    type Event = Event;
+    type DetermineContractAddress = pallet_contracts::SimpleAddressDeterminer<Runtime>;
+    type TrieIdGenerator = pallet_contracts::TrieIdFromParentCounter<Runtime>;
+    type RentPayment = ();
+    type SignedClaimHandicap = pallet_contracts::DefaultSignedClaimHandicap;
+    type TombstoneDeposit = TombstoneDeposit;
+    type StorageSizeOffset = pallet_contracts::DefaultStorageSizeOffset;
+    type RentByteFee = RentByteFee;
+    type RentDepositOffset = RentDepositOffset;
+    type SurchargeReward = SurchargeReward;
+    type MaxDepth = pallet_contracts::DefaultMaxDepth;
+    type MaxValueSize = pallet_contracts::DefaultMaxValueSize;
+    type WeightPrice = pallet_transaction_payment::Module<Self>;
+}
+
+parameter_types! {
+    pub MaximumSchedulerWeight: Weight = Perbill::from_percent(80) * MaximumBlockWeight::get();
+    pub const MaxScheduledPerBlock: u32 = 50;
+}
+
+impl pallet_scheduler::Trait for Runtime {
+    type Event = Event;
+    type Origin = Origin;
+    type PalletsOrigin = OriginCaller;
+    type Call = Call;
+    type MaximumWeight = MaximumSchedulerWeight;
+    type ScheduleOrigin = frame_system::EnsureRoot<AccountId>;
+    type MaxScheduledPerBlock = MaxScheduledPerBlock;
+    type WeightInfo = ();
+}
+
+/// Payload data to be signed when making signed transaction from off-chain workers,
+///   inside `create_transaction` function.
+pub type SignedPayload = generic::SignedPayload<Call, SignedExtra>;
+
+impl ocw_fqs_request::Trait for Runtime {
+	type AuthorityId = ocw_fqs_request::crypto::OcwFQSAuthId;
+	type Call = Call;
+	type Event = Event;
+}
+
+impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Runtime
+where
+	Call: From<LocalCall>,
+{
+	fn create_transaction<C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>>(
+		call: Call,
+		public: <Signature as sp_runtime::traits::Verify>::Signer,
+		account: AccountId,
+		index: Index,
+	) -> Option<(
+		Call,
+		<UncheckedExtrinsic as sp_runtime::traits::Extrinsic>::SignaturePayload,
+	)> {
+		let period = BlockHashCount::get() as u64;
+		let current_block = System::block_number()
+			.saturated_into::<u64>()
+			.saturating_sub(1);
+		let tip = 0;
+		let extra: SignedExtra = (
+			frame_system::CheckSpecVersion::<Runtime>::new(),
+			frame_system::CheckTxVersion::<Runtime>::new(),
+			frame_system::CheckGenesis::<Runtime>::new(),
+			frame_system::CheckEra::<Runtime>::from(generic::Era::mortal(period, current_block)),
+			frame_system::CheckNonce::<Runtime>::from(index),
+			frame_system::CheckWeight::<Runtime>::new(),
+			pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(tip),
+		);
+
+		#[cfg_attr(not(feature = "std"), allow(unused_variables))]
+		let raw_payload = SignedPayload::new(call, extra)
+			.map_err(|e| {
+				debug::native::warn!("SignedPayload error: {:?}", e);
+			})
+			.ok()?;
+
+		let signature = raw_payload.using_encoded(|payload| C::sign(payload, public))?;
+
+		let address = account;
+		let (call, extra, _) = raw_payload.deconstruct();
+		Some((call, (address, signature, extra)))
+	}
+}
+
+impl frame_system::offchain::SigningTypes for Runtime {
+	type Public = <Signature as sp_runtime::traits::Verify>::Signer;
+	type Signature = Signature;
+}
+
+impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
+where
+	Call: From<C>,
+{
+	type OverarchingCall = Call;
+	type Extrinsic = UncheckedExtrinsic;
+}
+
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -289,11 +423,16 @@ construct_runtime!(
 		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 		// Include the custom logic from the template pallet in the runtime.
 		TemplateModule: template::{Module, Call, Storage, Event<T>},
+		ProvenanceLedger: provenance_ledger::{Module, Call, Event<T>},
+		Contracts: pallet_contracts::{Module, Call, Config, Storage, Event<T>},
+		Scheduler: pallet_scheduler::{Module, Call, Storage, Event<T>},
+		// To use unsigned and signed transactions
+		OcwFQSrequest: ocw_fqs_request::{Module, Call, Event<T>}
 	}
 );
 
 /// The address format for describing accounts.
-pub type Address = sp_runtime::MultiAddress<AccountId, ()>;
+pub type Address = AccountId;
 /// Block header type as expected by this runtime.
 pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
 /// Block type as expected by this runtime.
@@ -449,6 +588,42 @@ impl_runtime_apis! {
 		}
 	}
 
+	impl pallet_contracts_rpc_runtime_api::ContractsApi<Block, AccountId, Balance, BlockNumber>
+        for Runtime
+    {
+        fn call(
+            origin: AccountId,
+            dest: AccountId,
+            value: Balance,
+            gas_limit: u64,
+            input_data: Vec<u8>,
+        ) -> ContractExecResult {
+            let (exec_result, gas_consumed) =
+                Contracts::bare_call(origin, dest.into(), value, gas_limit, input_data);
+            match exec_result {
+                Ok(v) => ContractExecResult::Success {
+                    flags: v.flags.bits(),
+                    data: v.data,
+                    gas_consumed: gas_consumed,
+                },
+                Err(_) => ContractExecResult::Error,
+            }
+        }
+
+        fn get_storage(
+            address: AccountId,
+            key: [u8; 32],
+        ) -> pallet_contracts_primitives::GetStorageResult {
+            Contracts::get_storage(address, key)
+        }
+
+        fn rent_projection(
+            address: AccountId,
+        ) -> pallet_contracts_primitives::RentProjectionResult<BlockNumber> {
+            Contracts::rent_projection(address)
+        }
+    }
+
 	#[cfg(feature = "runtime-benchmarks")]
 	impl frame_benchmarking::Benchmark<Block> for Runtime {
 		fn dispatch_benchmark(
@@ -478,6 +653,9 @@ impl_runtime_apis! {
 			add_benchmark!(params, batches, frame_system, SystemBench::<Runtime>);
 			add_benchmark!(params, batches, pallet_balances, Balances);
 			add_benchmark!(params, batches, pallet_timestamp, Timestamp);
+			add_benchmark!(params, batches, provenance_ledger, ProvenanceLedger);
+			add_benchmark!(params, batches, pallet_contracts, Contracts);
+			add_benchmark!(params, batches, pallet_scheduler, Scheduler);
 
 			if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }
 			Ok(batches)

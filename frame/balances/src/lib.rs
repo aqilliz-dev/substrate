@@ -79,7 +79,7 @@
 //! - [`Imbalance`](../frame_support/traits/trait.Imbalance.html): Functions for handling
 //! imbalances between total issuance in the system and account balances. Must be used when a function
 //! creates new funds (e.g. a reward) or destroys some funds (e.g. a system fee).
-//! - [`IsDeadAccount`](../frame_support/traits/trait.IsDeadAccount.html): Determiner to say whether a
+//! - [`IsDeadAccount`](../frame_system/trait.IsDeadAccount.html): Determiner to say whether a
 //! given account is unused.
 //!
 //! ## Interface
@@ -154,16 +154,17 @@ mod tests;
 mod tests_local;
 mod tests_composite;
 mod benchmarking;
-pub mod weights;
+mod default_weight;
 
 use sp_std::prelude::*;
 use sp_std::{cmp, result, mem, fmt::Debug, ops::BitOr, convert::Infallible};
 use codec::{Codec, Encode, Decode};
 use frame_support::{
 	StorageValue, Parameter, decl_event, decl_storage, decl_module, decl_error, ensure,
+	weights::{Weight, Pays},
 	traits::{
 		Currency, OnKilledAccount, OnUnbalanced, TryDrop, StoredMap,
-		WithdrawReasons, LockIdentifier, LockableCurrency, ExistenceRequirement,
+		WithdrawReason, WithdrawReasons, LockIdentifier, LockableCurrency, ExistenceRequirement,
 		Imbalance, SignedImbalance, ReservableCurrency, Get, ExistenceRequirement::KeepAlive,
 		ExistenceRequirement::AllowDeath, IsDeadAccount, BalanceStatus as Status,
 	}
@@ -177,7 +178,14 @@ use sp_runtime::{
 };
 use frame_system::{self as system, ensure_signed, ensure_root};
 pub use self::imbalances::{PositiveImbalance, NegativeImbalance};
-pub use weights::WeightInfo;
+
+pub trait WeightInfo {
+	fn transfer() -> Weight;
+	fn transfer_keep_alive() -> Weight;
+	fn set_balance_creating() -> Weight;
+	fn set_balance_killing() -> Weight;
+	fn force_transfer() -> Weight;
+}
 
 pub trait Subtrait<I: Instance = DefaultInstance>: frame_system::Trait {
 	/// The balance of an account.
@@ -292,9 +300,9 @@ pub enum Reasons {
 
 impl From<WithdrawReasons> for Reasons {
 	fn from(r: WithdrawReasons) -> Reasons {
-		if r == WithdrawReasons::from(WithdrawReasons::TRANSACTION_PAYMENT) {
+		if r == WithdrawReasons::from(WithdrawReason::TransactionPayment) {
 			Reasons::Fee
-		} else if r.contains(WithdrawReasons::TRANSACTION_PAYMENT) {
+		} else if r.contains(WithdrawReason::TransactionPayment) {
 			Reasons::All
 		} else {
 			Reasons::Misc
@@ -455,7 +463,7 @@ decl_module! {
 		/// - DB Weight: 1 Read and 1 Write to destination account
 		/// - Origin account is already in memory, so no DB operations for them.
 		/// # </weight>
-		#[weight = T::WeightInfo::transfer()]
+		#[weight = (T::WeightInfo::transfer(), Pays::No)]
 		pub fn transfer(
 			origin,
 			dest: <T::Lookup as StaticLookup>::Source,
@@ -484,8 +492,8 @@ decl_module! {
 		///     - Killing: 35.11 µs
 		/// - DB Weight: 1 Read, 1 Write to `who`
 		/// # </weight>
-		#[weight = T::WeightInfo::set_balance_creating() // Creates a new account.
-			.max(T::WeightInfo::set_balance_killing()) // Kills an existing account.
+		#[weight = (T::WeightInfo::set_balance_creating() // Creates a new account.
+			.max(T::WeightInfo::set_balance_killing()), Pays::No) // Kills an existing account.
 		]
 		fn set_balance(
 			origin,
@@ -528,7 +536,7 @@ decl_module! {
 		/// - Same as transfer, but additional read and write because the source account is
 		///   not assumed to be in the overlay.
 		/// # </weight>
-		#[weight = T::WeightInfo::force_transfer()]
+		#[weight = (T::WeightInfo::force_transfer(), Pays::No)]
 		pub fn force_transfer(
 			origin,
 			source: <T::Lookup as StaticLookup>::Source,
@@ -552,7 +560,7 @@ decl_module! {
 		/// - Base Weight: 51.4 µs
 		/// - DB Weight: 1 Read and 1 Write to dest (sender is in overlay already)
 		/// #</weight>
-		#[weight = T::WeightInfo::transfer_keep_alive()]
+		#[weight = (T::WeightInfo::transfer_keep_alive(), Pays::No)]
 		pub fn transfer_keep_alive(
 			origin,
 			dest: <T::Lookup as StaticLookup>::Source,
@@ -704,7 +712,7 @@ impl<T: Trait<I>, I: Instance> Module<T, I> {
 // of the inner member.
 mod imbalances {
 	use super::{
-		result, DefaultInstance, Imbalance, Trait, Zero, Instance, Saturating,
+		result, Subtrait, DefaultInstance, Imbalance, Trait, Zero, Instance, Saturating,
 		StorageValue, TryDrop,
 	};
 	use sp_std::mem;
@@ -712,9 +720,9 @@ mod imbalances {
 	/// Opaque, move-only struct with private fields that serves as a token denoting that
 	/// funds have been created without any equal and opposite accounting.
 	#[must_use]
-	pub struct PositiveImbalance<T: Trait<I>, I: Instance=DefaultInstance>(T::Balance);
+	pub struct PositiveImbalance<T: Subtrait<I>, I: Instance=DefaultInstance>(T::Balance);
 
-	impl<T: Trait<I>, I: Instance> PositiveImbalance<T, I> {
+	impl<T: Subtrait<I>, I: Instance> PositiveImbalance<T, I> {
 		/// Create a new positive imbalance from a balance.
 		pub fn new(amount: T::Balance) -> Self {
 			PositiveImbalance(amount)
@@ -724,9 +732,9 @@ mod imbalances {
 	/// Opaque, move-only struct with private fields that serves as a token denoting that
 	/// funds have been destroyed without any equal and opposite accounting.
 	#[must_use]
-	pub struct NegativeImbalance<T: Trait<I>, I: Instance=DefaultInstance>(T::Balance);
+	pub struct NegativeImbalance<T: Subtrait<I>, I: Instance=DefaultInstance>(T::Balance);
 
-	impl<T: Trait<I>, I: Instance> NegativeImbalance<T, I> {
+	impl<T: Subtrait<I>, I: Instance> NegativeImbalance<T, I> {
 		/// Create a new negative imbalance from a balance.
 		pub fn new(amount: T::Balance) -> Self {
 			NegativeImbalance(amount)
@@ -835,23 +843,79 @@ mod imbalances {
 		}
 	}
 
-	impl<T: Trait<I>, I: Instance> Drop for PositiveImbalance<T, I> {
+	impl<T: Subtrait<I>, I: Instance> Drop for PositiveImbalance<T, I> {
 		/// Basic drop handler will just square up the total issuance.
 		fn drop(&mut self) {
-			<super::TotalIssuance<T, I>>::mutate(
+			<super::TotalIssuance<super::ElevatedTrait<T, I>, I>>::mutate(
 				|v| *v = v.saturating_add(self.0)
 			);
 		}
 	}
 
-	impl<T: Trait<I>, I: Instance> Drop for NegativeImbalance<T, I> {
+	impl<T: Subtrait<I>, I: Instance> Drop for NegativeImbalance<T, I> {
 		/// Basic drop handler will just square up the total issuance.
 		fn drop(&mut self) {
-			<super::TotalIssuance<T, I>>::mutate(
+			<super::TotalIssuance<super::ElevatedTrait<T, I>, I>>::mutate(
 				|v| *v = v.saturating_sub(self.0)
 			);
 		}
 	}
+}
+
+// TODO: #2052
+// Somewhat ugly hack in order to gain access to module's `increase_total_issuance_by`
+// using only the Subtrait (which defines only the types that are not dependent
+// on Positive/NegativeImbalance). Subtrait must be used otherwise we end up with a
+// circular dependency with Trait having some types be dependent on PositiveImbalance<Trait>
+// and PositiveImbalance itself depending back on Trait for its Drop impl (and thus
+// its type declaration).
+// This works as long as `increase_total_issuance_by` doesn't use the Imbalance
+// types (basically for charging fees).
+// This should eventually be refactored so that the type item that
+// depends on the Imbalance type (DustRemoval) is placed in its own pallet.
+struct ElevatedTrait<T: Subtrait<I>, I: Instance>(T, I);
+impl<T: Subtrait<I>, I: Instance> Clone for ElevatedTrait<T, I> {
+	fn clone(&self) -> Self { unimplemented!() }
+}
+impl<T: Subtrait<I>, I: Instance> PartialEq for ElevatedTrait<T, I> {
+	fn eq(&self, _: &Self) -> bool { unimplemented!() }
+}
+impl<T: Subtrait<I>, I: Instance> Eq for ElevatedTrait<T, I> {}
+impl<T: Subtrait<I>, I: Instance> frame_system::Trait for ElevatedTrait<T, I> {
+	type BaseCallFilter = T::BaseCallFilter;
+	type Origin = T::Origin;
+	type Call = T::Call;
+	type Index = T::Index;
+	type BlockNumber = T::BlockNumber;
+	type Hash = T::Hash;
+	type Hashing = T::Hashing;
+	type AccountId = T::AccountId;
+	type Lookup = T::Lookup;
+	type Header = T::Header;
+	type Event = ();
+	type BlockHashCount = T::BlockHashCount;
+	type MaximumBlockWeight = T::MaximumBlockWeight;
+	type DbWeight = T::DbWeight;
+	type BlockExecutionWeight = T::BlockExecutionWeight;
+	type ExtrinsicBaseWeight = T::ExtrinsicBaseWeight;
+	type MaximumExtrinsicWeight = T::MaximumBlockWeight;
+	type MaximumBlockLength = T::MaximumBlockLength;
+	type AvailableBlockRatio = T::AvailableBlockRatio;
+	type Version = T::Version;
+	type PalletInfo = T::PalletInfo;
+	type OnNewAccount = T::OnNewAccount;
+	type OnKilledAccount = T::OnKilledAccount;
+	type AccountData = T::AccountData;
+	type SystemWeightInfo = T::SystemWeightInfo;
+}
+impl<T: Subtrait<I>, I: Instance> Trait<I> for ElevatedTrait<T, I> {
+	type Balance = T::Balance;
+	type Event = ();
+	type DustRemoval = ();
+	type ExistentialDeposit = T::ExistentialDeposit;
+	type AccountStore = T::AccountStore;
+	type WeightInfo = <T as Subtrait<I>>::WeightInfo;
+	type MaxLocks = T::MaxLocks;
 }
 
 impl<T: Trait<I>, I: Instance> Currency<T::AccountId> for Module<T, I> where
@@ -955,7 +1019,7 @@ impl<T: Trait<I>, I: Instance> Currency<T::AccountId> for Module<T, I> where
 				Self::ensure_can_withdraw(
 					transactor,
 					value,
-					WithdrawReasons::TRANSFER,
+					WithdrawReason::Transfer.into(),
 					from_account.free,
 				)?;
 
@@ -1114,7 +1178,7 @@ impl<T: Trait<I>, I: Instance> ReservableCurrency<T::AccountId> for Module<T, I>
 		Self::account(who).free
 			.checked_sub(&value)
 			.map_or(false, |new_balance|
-				Self::ensure_can_withdraw(who, value, WithdrawReasons::RESERVE, new_balance).is_ok()
+				Self::ensure_can_withdraw(who, value, WithdrawReason::Reserve.into(), new_balance).is_ok()
 			)
 	}
 
@@ -1131,7 +1195,7 @@ impl<T: Trait<I>, I: Instance> ReservableCurrency<T::AccountId> for Module<T, I>
 		Self::try_mutate_account(who, |account, _| -> DispatchResult {
 			account.free = account.free.checked_sub(&value).ok_or(Error::<T, I>::InsufficientBalance)?;
 			account.reserved = account.reserved.checked_add(&value).ok_or(Error::<T, I>::Overflow)?;
-			Self::ensure_can_withdraw(&who, value.clone(), WithdrawReasons::RESERVE, account.free)
+			Self::ensure_can_withdraw(&who, value.clone(), WithdrawReason::Reserve.into(), account.free)
 		})?;
 
 		Self::deposit_event(RawEvent::Reserved(who.clone(), value));
@@ -1247,7 +1311,7 @@ where
 		amount: T::Balance,
 		reasons: WithdrawReasons,
 	) {
-		if amount.is_zero() || reasons.is_empty() { return }
+		if amount.is_zero() || reasons.is_none() { return }
 		let mut new_lock = Some(BalanceLock { id, amount, reasons: reasons.into() });
 		let mut locks = Self::locks(who).into_iter()
 			.filter_map(|l| if l.id == id { new_lock.take() } else { Some(l) })
@@ -1266,7 +1330,7 @@ where
 		amount: T::Balance,
 		reasons: WithdrawReasons,
 	) {
-		if amount.is_zero() || reasons.is_empty() { return }
+		if amount.is_zero() || reasons.is_none() { return }
 		let mut new_lock = Some(BalanceLock { id, amount, reasons: reasons.into() });
 		let mut locks = Self::locks(who).into_iter().filter_map(|l|
 			if l.id == id {

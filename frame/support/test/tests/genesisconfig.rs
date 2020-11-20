@@ -15,10 +15,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub trait Trait: frame_support_test::Trait {}
+pub trait Trait {
+	type BlockNumber: codec::Codec + codec::EncodeLike + Default;
+	type Origin;
+}
 
 frame_support::decl_module! {
-	pub struct Module<T: Trait> for enum Call where origin: T::Origin, system=frame_support_test {}
+	pub struct Module<T: Trait> for enum Call where origin: T::Origin, system=self {}
 }
 
 frame_support::decl_storage! {
@@ -29,14 +32,10 @@ frame_support::decl_storage! {
 
 struct Test;
 
-impl frame_support_test::Trait for Test {
+impl Trait for Test {
 	type BlockNumber = u32;
 	type Origin = ();
-	type PalletInfo = ();
-	type DbWeight = ();
 }
-
-impl Trait for Test {}
 
 #[test]
 fn init_genesis_config() {

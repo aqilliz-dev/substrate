@@ -19,8 +19,9 @@ use sp_api::{
 	RuntimeApiInfo, decl_runtime_apis, impl_runtime_apis, mock_impl_runtime_apis,
 	ApiExt,
 };
+
 use sp_runtime::{traits::{GetNodeBlockType, Block as BlockT}, generic::BlockId};
-use sp_core::NativeOrEncoded;
+
 use substrate_test_runtime_client::runtime::Block;
 use sp_blockchain::Result;
 
@@ -102,20 +103,9 @@ mock_impl_runtime_apis! {
 			unimplemented!()
 		}
 
-		#[advanced]
-		fn same_name(_: &BlockId<Block>) -> std::result::Result<NativeOrEncoded<()>, String> {
-			Ok(().into())
-		}
+		fn same_name() {}
 
-		#[advanced]
-		fn wild_card(at: &BlockId<Block>, _: u32) -> std::result::Result<NativeOrEncoded<()>, String> {
-			if let BlockId::Number(1337) = at {
-				// yeah
-				Ok(().into())
-			} else {
-				Err("Ohh noooo".into())
-			}
-		}
+		fn wild_card(_: u32) {}
 	}
 
 	impl ApiWithCustomVersion<Block> for MockApi {
@@ -189,13 +179,4 @@ fn mock_runtime_api_panics_on_calling_old_version() {
 
 	#[allow(deprecated)]
 	let _ = mock.same_name_before_version_2(&BlockId::Number(0));
-}
-
-#[test]
-fn mock_runtime_api_works_with_advanced() {
-	let mock = MockApi { block: None };
-
-	Api::<Block>::same_name(&mock, &BlockId::Number(0)).unwrap();
-	mock.wild_card(&BlockId::Number(1337), 1).unwrap();
-	assert_eq!(String::from("Ohh noooo"), mock.wild_card(&BlockId::Number(1336), 1).unwrap_err());
 }
