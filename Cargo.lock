@@ -3990,6 +3990,7 @@ dependencies = [
  "pallet-node-authorization",
  "pallet-randomness-collective-flip",
  "pallet-scheduler",
+ "pallet-session",
  "pallet-sudo",
  "pallet-template",
  "pallet-timestamp",
@@ -4010,6 +4011,7 @@ dependencies = [
  "sp-transaction-pool",
  "sp-version",
  "substrate-wasm-builder-runner",
+ "validator-set",
 ]
 
 [[package]]
@@ -9723,6 +9725,21 @@ dependencies = [
  "idna 0.2.0",
  "matches",
  "percent-encoding 2.1.0",
+]
+
+[[package]]
+name = "validator-set"
+version = "0.2.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "pallet-session",
+ "parity-scale-codec",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
 ]
 
 [[package]]

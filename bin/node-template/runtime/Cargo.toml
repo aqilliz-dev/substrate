@@ -12,6 +12,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
 codec = { package = "parity-scale-codec", version = "1.3.4", default-features = false, features = ["derive"] }
+validatorset = { package = "validator-set", path = "../pallets/validator-set", default-features = false }
 
 pallet-aura = { version = "2.0.0", default-features = false, path = "../../../frame/aura" }
 pallet-balances = { version = "2.0.0", default-features = false, path = "../../../frame/balances" }
@@ -53,6 +54,8 @@ pallet-contracts = { version = '2.0.0', default-features = false, path = "../../
 pallet-contracts-primitives = { version = "2.0.0", default-features = false, path = "../../../frame/contracts/common/" }
 pallet-contracts-rpc-runtime-api = { version = "0.8.0", default-features = false, path = "../../../frame/contracts/rpc/runtime-api/" }
 pallet-node-authorization = { version = '2.0.0', default-features = false, path = "../../../frame/node-authorization" }
+pallet-session = { version = "2.0.0", path = "../../../frame/session", default-features = false }
+# pallet-session-benchmarking = { version = "2.0.0", path = "../../../frame/session/benchmarking", default-features = false, optional = true }
 
 pallet-scheduler = { version = "2.0.0", default-features = false, path = "../../../frame/scheduler" }
 
@@ -94,7 +97,9 @@ std = [
 	'pallet-contracts-rpc-runtime-api/std',
 	'pallet-scheduler/std',
 	'pallet-node-authorization/std',
-	'ocw-fqs-request/std'
+	"pallet-session/std",
+	'ocw-fqs-request/std',
+	'validatorset/std'
 ]
 runtime-benchmarks = [
 	"sp-runtime/runtime-benchmarks",
@@ -108,4 +113,5 @@ runtime-benchmarks = [
 	"provenance-ledger/runtime-benchmarks",
 	"pallet-contracts/runtime-benchmarks",
 	"pallet-scheduler/runtime-benchmarks",
+	# "pallet-session-benchmarking",
 ]

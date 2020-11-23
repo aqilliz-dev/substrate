@@ -16,4 +16,5 @@
 //! A list of the different weight modules for our runtime.
 pub mod provenance_ledger;
 pub mod pallet_balances;
+// pub mod pallet_session;
 // pub mod pallet_democracy;

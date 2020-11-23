@@ -13,7 +13,8 @@ use sp_runtime::{
 	transaction_validity::{TransactionValidity, TransactionSource},
 };
 use sp_runtime::traits::{
-	BlakeTwo256, Block as BlockT, IdentityLookup, Verify, IdentifyAccount, NumberFor, Saturating, SaturatedConversion
+	BlakeTwo256, Block as BlockT, IdentityLookup, Verify, IdentifyAccount,
+	NumberFor, OpaqueKeys, Saturating, SaturatedConversion
 };
 use frame_system::EnsureRoot;
 use sp_api::impl_runtime_apis;
@@ -21,6 +22,7 @@ use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use pallet_grandpa::{AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList};
 use pallet_grandpa::fg_primitives;
 use sp_version::RuntimeVersion;
+use pallet_session;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use pallet_contracts_rpc_runtime_api::ContractExecResult;
@@ -40,6 +42,7 @@ pub use frame_support::{
 		constants::{WEIGHT_PER_SECOND, WEIGHT_PER_MILLIS, WEIGHT_PER_MICROS},
 	},
 };
+// pub use validatorset;
 
 mod weights;
 
@@ -356,6 +359,27 @@ impl pallet_node_authorization::Trait for Runtime {
     type WeightInfo = ();
 }
 
+// parameter_types! {
+// 	pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(17);
+// }
+
+impl validatorset::Trait for Runtime {
+	type Event = Event;
+}
+
+impl pallet_session::Trait for Runtime {
+    type SessionHandler = <opaque::SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
+    type ShouldEndSession = ValidatorSet;
+    type SessionManager = ValidatorSet;
+    type Event = Event;
+    type Keys = opaque::SessionKeys;
+    type NextSessionRotation = ValidatorSet;
+    type ValidatorId = <Self as frame_system::Trait>::AccountId;
+    type ValidatorIdOf = validatorset::ValidatorOf<Self>;
+    type DisabledValidatorsThreshold = ();
+    type WeightInfo = ();
+}
+
 /// Payload data to be signed when making signed transaction from off-chain workers,
 ///   inside `create_transaction` function.
 pub type SignedPayload = generic::SignedPayload<Call, SignedExtra>;
@@ -433,6 +457,8 @@ construct_runtime!(
 		System: frame_system::{Module, Call, Config, Storage, Event<T>},
 		RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Module, Call, Storage},
 		Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
+		Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
+		ValidatorSet: validatorset::{Module, Call, Storage, Event<T>, Config<T>},
 		Aura: pallet_aura::{Module, Config<T>, Inherent},
 		Grandpa: pallet_grandpa::{Module, Call, Storage, Config, Event},
 		Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
@@ -648,9 +674,10 @@ impl_runtime_apis! {
 			config: frame_benchmarking::BenchmarkConfig
 		) -> Result<Vec<frame_benchmarking::BenchmarkBatch>, sp_runtime::RuntimeString> {
 			use frame_benchmarking::{Benchmarking, BenchmarkBatch, add_benchmark, TrackedStorageKey};
-
+			// use pallet_session_benchmarking::Module as SessionBench;
 			use frame_system_benchmarking::Module as SystemBench;
 			impl frame_system_benchmarking::Trait for Runtime {}
+			// impl pallet_session_benchmarking::Trait for Runtime {}
 
 			let whitelist: Vec<TrackedStorageKey> = vec![
 				// Block Number
@@ -674,6 +701,7 @@ impl_runtime_apis! {
 			add_benchmark!(params, batches, provenance_ledger, ProvenanceLedger);
 			add_benchmark!(params, batches, pallet_contracts, Contracts);
 			add_benchmark!(params, batches, pallet_scheduler, Scheduler);
+			// add_benchmark!(params, batches, pallet_session, SessionBench::<Runtime>);
 
 			if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }
 			Ok(batches)

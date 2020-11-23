@@ -1,7 +1,8 @@
 use sp_core::{Pair, Public, sr25519};
 use node_template_runtime::{
 	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
-	SudoConfig, SystemConfig, WASM_BINARY, Signature
+	SudoConfig, SystemConfig, WASM_BINARY, Signature, SessionConfig, opaque::SessionKeys,
+	ValidatorSetConfig
 };
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_finality_grandpa::AuthorityId as GrandpaId;
@@ -34,9 +35,17 @@ pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId where
 	AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
 }
 
+fn session_keys(
+	aura: AuraId,
+	grandpa: GrandpaId,
+) -> SessionKeys {
+	SessionKeys { aura, grandpa }
+}
+
 /// Generate an Aura authority key.
-pub fn authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
+pub fn authority_keys_from_seed(s: &str) -> (AccountId, AuraId, GrandpaId) {
 	(
+		get_account_id_from_seed::<sr25519::Public>(s),
 		get_from_seed::<AuraId>(s),
 		get_from_seed::<GrandpaId>(s),
 	)
@@ -132,7 +141,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 /// Configure initial storage state for FRAME modules.
 fn testnet_genesis(
 	wasm_binary: &[u8],
-	initial_authorities: Vec<(AuraId, GrandpaId)>,
+	initial_authorities: Vec<(AccountId, AuraId, GrandpaId)>,
 	root_key: AccountId,
 	endowed_accounts: Vec<AccountId>,
 	enable_println: bool,
@@ -148,14 +157,24 @@ fn testnet_genesis(
 			balances: endowed_accounts.iter().cloned().map(|k|(k, 1 << 60)).collect(),
 		}),
 		pallet_aura: Some(AuraConfig {
-			authorities: initial_authorities.iter().map(|x| (x.0.clone())).collect(),
+			// authorities: initial_authorities.iter().map(|x| (x.0.clone())).collect(),
+			authorities: vec![],
 		}),
 		pallet_grandpa: Some(GrandpaConfig {
-			authorities: initial_authorities.iter().map(|x| (x.1.clone(), 1)).collect(),
+			// authorities: initial_authorities.iter().map(|x| (x.1.clone(), 1)).collect(),
+			authorities: vec![],
 		}),
 		pallet_sudo: Some(SudoConfig {
 			// Assign network admin rights.
 			key: root_key,
+		}),
+		validatorset: Some(ValidatorSetConfig {
+			validators: initial_authorities.iter().map(|x| x.0.clone()).collect::<Vec<_>>(),
+		}),
+		pallet_session: Some(SessionConfig {
+			keys: initial_authorities.iter().map(|x| {
+				(x.0.clone(), x.0.clone(), session_keys(x.1.clone(), x.2.clone()))
+			}).collect::<Vec<_>>(),
 		}),
 		pallet_contracts: Some(ContractsConfig {
             current_schedule: pallet_contracts::Schedule {
@@ -166,8 +185,16 @@ fn testnet_genesis(
 		pallet_node_authorization: Some(NodeAuthorizationConfig {
 			nodes: vec![
 				(
-					OpaquePeerId(bs58::decode("12D3KooWBmAwcd4PJNJvfV89HwE48nwkRmAgo8Vy3uQEyNNHBox2").into_vec().unwrap()),
+					OpaquePeerId(bs58::decode("12D3KooWDeyKmW2ri7qsR19eL6FdgHeJ517U8KLrQHqepy229KhR").into_vec().unwrap()),
 					endowed_accounts[0].clone()
+				),
+				(
+					OpaquePeerId(bs58::decode("12D3KooWBBQPAbBeGabLh3avLhCRXFxJZkqQQdG3VErFQNM3rfQt").into_vec().unwrap()),
+					endowed_accounts[1].clone()
+				),
+				(
+					OpaquePeerId(bs58::decode("12D3KooWMFg1oWJBdhvYgSmStGbq1o28Q4qxhDzDeg6rSZhNyHBE").into_vec().unwrap()),
+					endowed_accounts[2].clone()
 				),
 			],
 		}),
