@@ -1,6 +1,6 @@
 {
-  "name": "Local Testnet",
-  "id": "local_testnet",
+  "name": "Zirca DEC",
+  "id": "zirca_dev",
   "chainType": "Local",
   "bootNodes": [],
   "telemetryEndpoints": null,
@@ -17,27 +17,13 @@
       "palletSession": {
         "keys": [
           [
-            "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
-            "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+            "5CHucvTwrPg8L2tjneVoemApqXcUaEdUDsCEPyE7aDwrtR8D",
+            "5CHucvTwrPg8L2tjneVoemApqXcUaEdUDsCEPyE7aDwrtR8D",
             {
-              "aura": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
-              "grandpa": "5FA9nQDVg267DEd8m1ZypXLBnvN7SFxYwV7ndqSYGiN9TTpu"
-            }
-          ],
-          [
-            "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
-            "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
-            {
-              "aura": "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
-              "grandpa": "5GoNkf6WdbxCFnPdAnYYQyCjAKPJgLNxXwPjwTh6DGg6gN3E"
+              "aura": "5CHucvTwrPg8L2tjneVoemApqXcUaEdUDsCEPyE7aDwrtR8D",
+              "grandpa": "5CesK3uTmn4NGfD3oyGBd1jrp4EfRyYdtqL3ERe9SXv8jUHb"
             }
           ]
-        ]
-      },
-      "validatorset": {
-        "validators": [
-          "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
-          "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"
         ]
       },
       "palletAura": {
@@ -49,57 +35,37 @@
       "palletBalances": {
         "balances": [
           [
-            "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
-            1152921504606846976
+          "5CHucvTwrPg8L2tjneVoemApqXcUaEdUDsCEPyE7aDwrtR8D",
+          1152921504606846976
           ],
           [
-            "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
-            1152921504606846976
+          "5FQu2BE4ZQVof4o5k5DLpRQiiPM81K1XS5ta4GAai2fksHTR",
+          1152921504606846976
           ],
           [
-            "5FLSigC9HGRKVhB9FiEo4Y3koPsNmBmLJbpXg2mp1hXcS59Y",
-            1152921504606846976
+          "5G3f4Yer2qKCHpSDJanzggxyGNunuez9nceByA6nP9QPJzfn",
+          1152921504606846976
           ],
           [
-            "5DAAnrj7VHTznn2AWBemMuyBwZWs6FNFjdyVXUeYum3PTXFy",
-            1152921504606846976
+          "5DSEnRNAgMH2LDuG5qeu2NJakBBMuHRRb6bbzF2nfgMHRdDH",
+          1152921504606846976
           ],
           [
-            "5HGjWAeFDfFCWPsjFQdVV2Msvz2XtMktvgocEZcCj68kUMaw",
-            1152921504606846976
+          "5DWtMbYZUbuMNiJHwhiatWkxKSL2E7f1gWxYKFVX179mPdXN",
+          1152921504606846976
           ],
           [
-            "5CiPPseXPECbkjWCa6MnjNokrgYjMqmKndv2rSnekmSK2DjL",
-            1152921504606846976
+          "5CUnmPmkaUnNJVURKLgeKs3SsRbJiNmAhYNEvAZq4XKnhGm9",
+          1152921504606846976
           ],
           [
-            "5GNJqTPyNqANBkUVMN1LPPrxXnFouWXoe2wNSmmEoLctxiZY",
-            1152921504606846976
-          ],
-          [
-            "5HpG9w8EBLe5XCrbczpwq5TSXvedjrBGCwqxK1iQ7qUsSWFc",
-            1152921504606846976
-          ],
-          [
-            "5Ck5SLSHYac6WFt5UZRSsdJjwmpSZq85fd5TRNAdZQVzEAPT",
-            1152921504606846976
-          ],
-          [
-            "5HKPmK9GYtE1PSLsS1qiYU9xQ9Si1NcEhdeCq9sw5bqu4ns8",
-            1152921504606846976
-          ],
-          [
-            "5FCfAonRZgTFrTd9HREEyeJjDpT397KMzizE6T3DvebLFE7n",
-            1152921504606846976
-          ],
-          [
-            "5CRmqmsiNFExV6VbdmPJViVxrWmkaXXvBrSX8oqBT8R9vmWk",
-            1152921504606846976
+          "5ERofxRAsrXseqFx1kAMTgpnfHAGmygDfHbgbD8FEFeJd4h7",
+          1152921504606846976
           ]
         ]
       },
       "palletSudo": {
-        "key": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+        "key": "5CHucvTwrPg8L2tjneVoemApqXcUaEdUDsCEPyE7aDwrtR8D"
       },
       "palletContracts": {
         "currentSchedule": {
@@ -170,50 +136,7 @@
               66,
               32
             ],
-            "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
-          ],
-          [
-            [
-              0,
-              36,
-              8,
-              1,
-              18,
-              32,
-              20,
-              63,
-              99,
-              50,
-              35,
-              232,
-              130,
-              168,
-              252,
-              56,
-              53,
-              138,
-              129,
-              82,
-              204,
-              21,
-              188,
-              149,
-              170,
-              135,
-              106,
-              148,
-              224,
-              92,
-              244,
-              107,
-              103,
-              224,
-              227,
-              197,
-              181,
-              201
-            ],
-            "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"
+            "5CHucvTwrPg8L2tjneVoemApqXcUaEdUDsCEPyE7aDwrtR8D"
           ]
         ]
       }

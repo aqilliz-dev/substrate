@@ -192,10 +192,6 @@ fn testnet_genesis(
 					OpaquePeerId(bs58::decode("12D3KooWBBQPAbBeGabLh3avLhCRXFxJZkqQQdG3VErFQNM3rfQt").into_vec().unwrap()),
 					endowed_accounts[1].clone()
 				),
-				(
-					OpaquePeerId(bs58::decode("12D3KooWMFg1oWJBdhvYgSmStGbq1o28Q4qxhDzDeg6rSZhNyHBE").into_vec().unwrap()),
-					endowed_accounts[2].clone()
-				),
 			],
 		}),
 	}
