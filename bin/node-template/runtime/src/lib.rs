@@ -51,6 +51,8 @@ pub use template;
 
 pub use provenance_ledger;
 
+pub use data_reconciliation;
+
 pub use ocw_fqs_request;
 
 /// An index to a block.
@@ -107,7 +109,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("node-template"),
 	impl_name: create_runtime_str!("node-template"),
 	authoring_version: 1,
-	spec_version: 2,
+	spec_version: 1,
 	impl_version: 1,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
@@ -301,6 +303,10 @@ impl provenance_ledger::Trait for Runtime {
 	type WeightInfo = weights::provenance_ledger::WeightInfo;
 }
 
+impl data_reconciliation::Trait for Runtime {
+	type Event = Event;
+}
+
 parameter_types! {
     pub const TombstoneDeposit: Balance = 16 * MILLICENTS;
     pub const RentByteFee: Balance = 4 * MILLICENTS;
@@ -472,6 +478,7 @@ construct_runtime!(
 		// To use unsigned and signed transactions
 		OcwFQSrequest: ocw_fqs_request::{Module, Call, Event<T>},
 		NodeAuthorization: pallet_node_authorization::{Module, Call, Storage, Event<T>, Config<T>},
+		DataReconciliation: data_reconciliation::{Module, Call, Storage, Event<T>},
 	}
 );
 
