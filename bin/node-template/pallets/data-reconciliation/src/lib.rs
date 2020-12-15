@@ -275,22 +275,19 @@ impl<T: Trait> Module<T> {
 	}
 
 	fn run_reconciliation(aggregated_data: &AggregatedData, record: &mut ReconciledData) {
-
 		let campaign = <Campaigns>::get(&aggregated_data.campaign_id);
 		let reconciliation_threshold = campaign.reconciliation_threshold;
 
-		let impressions: FixedU128 = FixedU128::from_inner(*(&record.impressions.client)* QUINTILLION);
-		// let impressions: Percent = Percent::from_percent(*(&aggregated_data.impressions));
-		// let percent_impressions: Percent = Percent::from_percent(reconciliation_threshold);
-		let percent_impressions: FixedU128 = FixedU128::from_inner(reconciliation_threshold) / FixedU128::from_inner(100);
+		let impressions_zdmp: FixedU128 = FixedU128::from_inner(*(&record.impressions.zdmp)* QUINTILLION);
+		let impressions_platform: FixedU128 = FixedU128::from_inner(*(&record.impressions.platform)* QUINTILLION);
 
-		// impressions * percent_impressions;
+		let percentage_threshold: FixedU128 = FixedU128::from_inner(reconciliation_threshold) / FixedU128::from_inner(100);
+		let impressions_zdmp_threshold = impressions_zdmp * percentage_threshold;
 
-
-		debug::info!("Threshold {:?}", percent_impressions);
-		debug::info!("Impresions {:?}", *(&record.impressions.client));
-		debug::info!("Impresions U128 {:?}", impressions);
-		debug::info!("Result U128 {:?}", impressions * percent_impressions);
+		debug::info!("Percentage Threshold {:?}", percentage_threshold);
+		debug::info!("Impresions ZDMP {:?}", *(&record.impressions.zdmp));
+		debug::info!("Impresions ZDMP U128 {:?}", impressions_zdmp);
+		debug::info!("Impressions ZDMP Threshold U128 {:?}", impressions_zdmp_threshold);
 
 		// kpis_clicks.final_count = *(&aggregated_data.clicks);
 		// kpis_conversions.final_count = *(&aggregated_data.conversions);
