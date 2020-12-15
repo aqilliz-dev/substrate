@@ -248,7 +248,12 @@ impl<T: Trait> Module<T> {
 		// Self::update_kpis(&aggregated_data, &mut kpis_impressions, &mut kpis_clicks, &mut kpis_conversions);
 		Self::update_kpis(&aggregated_data, &mut record.impressions, &mut record.clicks, &mut record.conversions);
 
-		Self::run_reconciliation(&aggregated_data, &mut record);
+		let campaign = <Campaigns>::get(&aggregated_data.campaign_id);
+		let reconciliation_threshold = campaign.reconciliation_threshold;
+		let percentage_threshold: FixedU128 = FixedU128::from_inner(reconciliation_threshold) / FixedU128::from_inner(100);
+
+		// Impressions
+		Self::run_reconciliation(&aggregated_data, &mut record.impressions, percentage_threshold);
 
 		<ReconciledDataStore>::insert(&date_campaign, &aggregated_data.platform, record);
 	}
@@ -274,20 +279,41 @@ impl<T: Trait> Module<T> {
 		}
 	}
 
-	fn run_reconciliation(aggregated_data: &AggregatedData, record: &mut ReconciledData) {
-		let campaign = <Campaigns>::get(&aggregated_data.campaign_id);
-		let reconciliation_threshold = campaign.reconciliation_threshold;
+	fn run_reconciliation(aggregated_data: &AggregatedData, kpi: &mut Kpis, percentage_threshold: FixedU128) {
+		let count_zdmp: FixedU128 = FixedU128::from_inner(*(&kpi.zdmp)* QUINTILLION);
+		let count_platform: FixedU128 = FixedU128::from_inner(*(&kpi.platform)* QUINTILLION);
 
-		let impressions_zdmp: FixedU128 = FixedU128::from_inner(*(&record.impressions.zdmp)* QUINTILLION);
-		let impressions_platform: FixedU128 = FixedU128::from_inner(*(&record.impressions.platform)* QUINTILLION);
+		let count_zdmp_threshold = count_zdmp * percentage_threshold;
+		let count_zdmp_ceil = count_zdmp + count_zdmp_threshold;
+		let count_zdmp_floor = count_zdmp - count_zdmp_threshold;
 
-		let percentage_threshold: FixedU128 = FixedU128::from_inner(reconciliation_threshold) / FixedU128::from_inner(100);
-		let impressions_zdmp_threshold = impressions_zdmp * percentage_threshold;
+		if (kpi.platform != 0 && kpi.zdmp != 0 && (count_platform <= count_zdmp_ceil) && (count_platform >= count_zdmp_floor)) {
+			kpi.final_count = kpi.platform;
+		} else {
+			if (kpi.zdmp != 0) {
+				kpi.final_count = kpi.zdmp;
+			} else if (kpi.platform != 0) {
+				kpi.final_count = kpi.platform;
+			}
+		}
+
+		let count_final: FixedU128 = FixedU128::from_inner(*(&kpi.final_count)* QUINTILLION);
+		let count_client: FixedU128 = FixedU128::from_inner(*(&kpi.client)* QUINTILLION);
+
+		let count_final_threshold = count_final * percentage_threshold;
+		let count_final_ceil = count_final + count_final_threshold;
+		let count_final_floor = count_final - count_final_threshold;
+
+		if (kpi.client != 0 && kpi.final_count != 0 && (count_client <= count_final_ceil) && (count_client >= count_final_floor)) {
+			kpi.final_count = kpi.client;
+		} else if (kpi.client == 0 && kpi.zdmp == 0 && kpi.platform == 0) {
+			kpi.final_count = 0;
+		}
 
 		debug::info!("Percentage Threshold {:?}", percentage_threshold);
-		debug::info!("Impresions ZDMP {:?}", *(&record.impressions.zdmp));
-		debug::info!("Impresions ZDMP U128 {:?}", impressions_zdmp);
-		debug::info!("Impressions ZDMP Threshold U128 {:?}", impressions_zdmp_threshold);
+		debug::info!("Impresions ZDMP {:?}", *(&kpi.zdmp));
+		debug::info!("Impresions ZDMP U128 {:?}", count_zdmp);
+		debug::info!("Impressions ZDMP Threshold U128 {:?}", count_zdmp_threshold);
 
 		// kpis_clicks.final_count = *(&aggregated_data.clicks);
 		// kpis_conversions.final_count = *(&aggregated_data.conversions);
