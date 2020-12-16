@@ -10,7 +10,8 @@ use frame_support::{
     decl_module, decl_event, decl_storage, decl_error,
 	storage::{StorageDoubleMap, StorageMap, StorageValue},
 	codec::{Encode, Decode},
-	sp_runtime::{RuntimeDebug, Percent, FixedU128}
+	sp_runtime::{RuntimeDebug, Percent, FixedU128},
+	dispatch::DispatchResult
 };
 
 use frame_system::{self as system, ensure_signed};
@@ -38,6 +39,8 @@ pub type Platform = Vec<u8>;
 pub type Source = Vec<u8>;
 pub type Date = Vec<u8>;
 pub type DateCampaign = Vec<u8>;
+pub type ErrorMessage = Vec<u8>;
+pub type Failed = bool;
 
 #[derive(Encode, Decode, Clone, Default, RuntimeDebug, PartialEq, Eq)]
 pub struct Campaign {
@@ -61,6 +64,7 @@ pub struct AggregatedData {
 	campaign_id: CampaignId,
 	platform: Platform,
 	date: Date,
+	date_received: Date,
 	source: Source,
 	impressions: u128,
 	clicks: u128,
@@ -112,26 +116,26 @@ decl_event! {
 	{
         /// Campaign is set
         CampaignSet(AccountId, CampaignId, Campaign),
-		/// Aggregated Data is set
-        AggregatedDataProcessed(AccountId, DateCampaign, AggregatedData),
+		/// Aggregated Data is processed
+        AggregatedDataProcessed(AccountId, AggregatedData, Failed, ErrorMessage),
     }
 }
 
-decl_error! {
-	pub enum Error for Module<T: Trait> {
-		/// Campaign ID does not exist
-		CampaignDoesNotExist,
+// decl_error! {
+// 	pub enum Error for Module<T: Trait> {
+// 		/// Campaign ID does not exist
+// 		// CampaignDoesNotExist,
 
-		// /// The value cannot be incremented further because it has reached the maimum allowed value
-		// MaxValueReached,
-	}
-}
+// 		// /// The value cannot be incremented further because it has reached the maimum allowed value
+// 		// MaxValueReached,
+// 	}
+// }
 
 
 decl_module! {
 	/// The module declaration.
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-		type Error = Error<T>;
+		// type Error = Error<T>;
 
 		#[weight = (0, Pays::No)]
 		fn set_campaign(origin, campaign_id: CampaignId, campaign: Campaign) {
@@ -152,29 +156,38 @@ decl_module! {
 		}
 
 		#[weight = (0, Pays::No)]
-		fn set_aggregated_data(origin, aggregated_data: AggregatedData) {
+		fn set_aggregated_data(origin, aggregated_data: AggregatedData) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 
 			// ensure!(<Campaigns>::contains_key(&aggregated_data.campaign_id), Error::<T>::CampaignDoesNotExist);
-
-			<ReconciledDateCampaigns>::insert(&aggregated_data.date, &aggregated_data.campaign_id, true);
-			<ReconciledCampaignDates>::insert(&aggregated_data.campaign_id, &aggregated_data.date, true);
-
-			let mut date_campaign = aggregated_data.date.clone();
-			let campaign_id = aggregated_data.campaign_id.clone();
-
-			date_campaign.extend(b"-".to_vec());
-			date_campaign.extend(campaign_id);
-
-			Self::calculate_reconciled_data(&date_campaign, &aggregated_data);
 
 			// Create Event Topic name
 			let mut topic_name = Vec::new();
 			topic_name.extend_from_slice(b"data-reconciliation");
 			let topic = T::Hashing::hash(&topic_name[..]);
 
-			let event = <T as Trait>::Event::from(RawEvent::AggregatedDataProcessed(sender, date_campaign, aggregated_data));
-			frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+			if <Campaigns>::contains_key(&aggregated_data.campaign_id) {
+				<ReconciledDateCampaigns>::insert(&aggregated_data.date, &aggregated_data.campaign_id, true);
+				<ReconciledCampaignDates>::insert(&aggregated_data.campaign_id, &aggregated_data.date, true);
+
+				let mut date_campaign = aggregated_data.date.clone();
+				let campaign_id = aggregated_data.campaign_id.clone();
+
+				date_campaign.extend(b"-".to_vec());
+				date_campaign.extend(campaign_id);
+
+				Self::calculate_reconciled_data(&date_campaign, &aggregated_data);
+
+				let event = <T as Trait>::Event::from(RawEvent::AggregatedDataProcessed(sender, aggregated_data, false, b"".to_vec()));
+				frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+
+				Ok(())
+			} else {
+				let event = <T as Trait>::Event::from(RawEvent::AggregatedDataProcessed(sender, aggregated_data, true, b"Campaign ID does not exist".to_vec()));
+				frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+
+				Ok(())
+			}
 		}
 	}
 }
@@ -182,10 +195,10 @@ decl_module! {
 impl<T: Trait> Module<T> {
 	fn calculate_reconciled_data(date_campaign: &DateCampaign, aggregated_data: &AggregatedData) {
 
-		debug::info!("Date-Campaign {:?}", *date_campaign);
-		debug::info!("Aggregated data {:?}", *aggregated_data);
+		// debug::info!("Date-Campaign {:?}", *date_campaign);
+		// debug::info!("Aggregated data {:?}", *aggregated_data);
 
-		let mut sources: Vec::<(Platform, u64)> = Vec::new();
+		// let mut sources: Vec::<(Platform, u64)> = Vec::new();
 
 		let campaign_date_platform_exists = <ReconciledDataStore>::contains_key(&date_campaign, &aggregated_data.platform);
 
@@ -241,11 +254,6 @@ impl<T: Trait> Module<T> {
 	fn update_recociled_data_record(date_campaign: &DateCampaign, aggregated_data: &AggregatedData) {
 		let mut record = <ReconciledDataStore>::get(&date_campaign, &aggregated_data.platform);
 
-		// let mut kpis_impressions = record.impressions;
-		// let mut kpis_clicks = record.clicks;
-		// let mut kpis_conversions = record.conversions;
-
-		// Self::update_kpis(&aggregated_data, &mut kpis_impressions, &mut kpis_clicks, &mut kpis_conversions);
 		Self::update_kpis(&aggregated_data, &mut record.impressions, &mut record.clicks, &mut record.conversions);
 
 		let campaign = <Campaigns>::get(&aggregated_data.campaign_id);
@@ -254,6 +262,10 @@ impl<T: Trait> Module<T> {
 
 		// Impressions
 		Self::run_reconciliation(&aggregated_data, &mut record.impressions, percentage_threshold);
+		// Clicks
+		Self::run_reconciliation(&aggregated_data, &mut record.clicks, percentage_threshold);
+		// Conversions
+		Self::run_reconciliation(&aggregated_data, &mut record.conversions, percentage_threshold);
 
 		<ReconciledDataStore>::insert(&date_campaign, &aggregated_data.platform, record);
 	}
@@ -310,20 +322,9 @@ impl<T: Trait> Module<T> {
 			kpi.final_count = 0;
 		}
 
-		debug::info!("Percentage Threshold {:?}", percentage_threshold);
-		debug::info!("Impresions ZDMP {:?}", *(&kpi.zdmp));
-		debug::info!("Impresions ZDMP U128 {:?}", count_zdmp);
-		debug::info!("Impressions ZDMP Threshold U128 {:?}", count_zdmp_threshold);
-
-		// kpis_clicks.final_count = *(&aggregated_data.clicks);
-		// kpis_conversions.final_count = *(&aggregated_data.conversions);
-		// *(&record).
-		// let record = ReconciledData {
-		// 	amount_spent: 0,
-		// 	budget_utilisation: 0,
-		// 	impressions: *(&kpis_impressions),
-		// 	clicks: *kpis_clicks,
-		// 	conversions: *kpis_conversions
-		// };
+		// debug::info!("Percentage Threshold {:?}", percentage_threshold);
+		// debug::info!("Impresions ZDMP {:?}", *(&kpi.zdmp));
+		// debug::info!("Impresions ZDMP U128 {:?}", count_zdmp);
+		// debug::info!("Impressions ZDMP Threshold U128 {:?}", count_zdmp_threshold);
 	}
 }
