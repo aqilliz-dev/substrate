@@ -53,6 +53,7 @@ pub struct Campaign {
 	advertiser: Vec<u8>,
 	brand: Vec<u8>,
 	reconciliation_threshold: u128,
+	decimals: u8,
 	version: u8,
 	cpc: (bool, u128),
 	cpm: (bool, u128),
@@ -159,29 +160,45 @@ decl_module! {
 		fn set_aggregated_data(origin, aggregated_data: AggregatedData) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 
-			// ensure!(<Campaigns>::contains_key(&aggregated_data.campaign_id), Error::<T>::CampaignDoesNotExist);
-
 			// Create Event Topic name
 			let mut topic_name = Vec::new();
 			topic_name.extend_from_slice(b"data-reconciliation");
 			let topic = T::Hashing::hash(&topic_name[..]);
 
-			if <Campaigns>::contains_key(&aggregated_data.campaign_id) {
-				<ReconciledDateCampaigns>::insert(&aggregated_data.date, &aggregated_data.campaign_id, true);
-				<ReconciledCampaignDates>::insert(&aggregated_data.campaign_id, &aggregated_data.date, true);
+			let campaign_exists = <Campaigns>::contains_key(&aggregated_data.campaign_id);
 
-				let mut date_campaign = aggregated_data.date.clone();
-				let campaign_id = aggregated_data.campaign_id.clone();
+			if campaign_exists {
 
-				date_campaign.extend(b"-".to_vec());
-				date_campaign.extend(campaign_id);
+				let campaign = <Campaigns>::get(&aggregated_data.campaign_id);
+				let campaign_platforms = campaign.platforms;
 
-				Self::calculate_reconciled_data(&date_campaign, &aggregated_data);
+				let campaign_platform_exists = match campaign_platforms.binary_search(&aggregated_data.platform) {
+					Ok(_) => true,
+					Err(_) => false
+				};
 
-				let event = <T as Trait>::Event::from(RawEvent::AggregatedDataProcessed(sender, aggregated_data, false, b"".to_vec()));
-				frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+				if campaign_platform_exists {
+					<ReconciledDateCampaigns>::insert(&aggregated_data.date, &aggregated_data.campaign_id, true);
+					<ReconciledCampaignDates>::insert(&aggregated_data.campaign_id, &aggregated_data.date, true);
 
-				Ok(())
+					let mut date_campaign = aggregated_data.date.clone();
+					let campaign_id = aggregated_data.campaign_id.clone();
+
+					date_campaign.extend(b"-".to_vec());
+					date_campaign.extend(campaign_id);
+
+					Self::calculate_reconciled_data(&date_campaign, &aggregated_data);
+
+					let event = <T as Trait>::Event::from(RawEvent::AggregatedDataProcessed(sender, aggregated_data, false, b"".to_vec()));
+					frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+
+					Ok(())
+				} else {
+					let event = <T as Trait>::Event::from(RawEvent::AggregatedDataProcessed(sender, aggregated_data, true, b"Platform does not exist for the Campaign".to_vec()));
+					frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+
+					Ok(())
+				}
 			} else {
 				let event = <T as Trait>::Event::from(RawEvent::AggregatedDataProcessed(sender, aggregated_data, true, b"Campaign ID does not exist".to_vec()));
 				frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
@@ -194,12 +211,6 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
 	fn calculate_reconciled_data(date_campaign: &DateCampaign, aggregated_data: &AggregatedData) {
-
-		// debug::info!("Date-Campaign {:?}", *date_campaign);
-		// debug::info!("Aggregated data {:?}", *aggregated_data);
-
-		// let mut sources: Vec::<(Platform, u64)> = Vec::new();
-
 		let campaign_date_platform_exists = <ReconciledDataStore>::contains_key(&date_campaign, &aggregated_data.platform);
 
 		if campaign_date_platform_exists == false {
