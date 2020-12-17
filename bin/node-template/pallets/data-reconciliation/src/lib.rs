@@ -10,7 +10,7 @@ use frame_support::{
     decl_module, decl_event, decl_storage, decl_error,
 	storage::{StorageDoubleMap, StorageMap, StorageValue},
 	codec::{Encode, Decode},
-	sp_runtime::{RuntimeDebug, Percent, FixedU128},
+	sp_runtime::{RuntimeDebug, Percent, FixedU128, Perquintill},
 	dispatch::DispatchResult
 };
 
@@ -53,7 +53,7 @@ pub struct Campaign {
 	advertiser: Vec<u8>,
 	brand: Vec<u8>,
 	reconciliation_threshold: u128,
-	decimals: u8,
+	decimals: u32,
 	version: u8,
 	cpc: (bool, u128),
 	cpm: (bool, u128),
@@ -168,7 +168,6 @@ decl_module! {
 			let campaign_exists = <Campaigns>::contains_key(&aggregated_data.campaign_id);
 
 			if campaign_exists {
-
 				let campaign = <Campaigns>::get(&aggregated_data.campaign_id);
 				let campaign_platforms = campaign.platforms;
 
@@ -320,6 +319,8 @@ impl<T: Trait> Module<T> {
 			}
 		}
 
+		debug::info!("Final Count U128 {:?}", kpi.final_count);
+
 		let count_final: FixedU128 = FixedU128::from_inner(*(&kpi.final_count)* QUINTILLION);
 		let count_client: FixedU128 = FixedU128::from_inner(*(&kpi.client)* QUINTILLION);
 
@@ -337,5 +338,15 @@ impl<T: Trait> Module<T> {
 		// debug::info!("Impresions ZDMP {:?}", *(&kpi.zdmp));
 		// debug::info!("Impresions ZDMP U128 {:?}", count_zdmp);
 		// debug::info!("Impressions ZDMP Threshold U128 {:?}", count_zdmp_threshold);
+	}
+
+	fn divide(a: u128, b: u128, decimals: u32) -> u128 {
+		let factor = 10u128.pow(decimals);
+		return (a * factor) / b
+	}
+
+	fn multiply(a: u128, b: u128, decimals: u32) -> u128 {
+		let factor = 10u128.pow(decimals);
+		return (a * b) / factor
 	}
 }
