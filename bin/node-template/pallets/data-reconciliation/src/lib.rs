@@ -76,6 +76,7 @@ pub struct AggregatedData {
 pub struct Kpis {
 	final_count: u128,
 	cost: u128,
+	budget_utilisation: u128,
 	zdmp: u128,
 	platform: u128,
 	client: u128
@@ -223,6 +224,7 @@ impl<T: Trait> Module<T> {
 		let mut kpis_impressions = Kpis {
 			final_count: 0,
 			cost: 0,
+			budget_utilisation: 0,
 			zdmp: 0,
 			platform: 0,
 			client: 0
@@ -231,6 +233,7 @@ impl<T: Trait> Module<T> {
 		let mut kpis_clicks = Kpis {
 			final_count: 0,
 			cost: 0,
+			budget_utilisation: 0,
 			zdmp: 0,
 			platform: 0,
 			client: 0
@@ -239,6 +242,7 @@ impl<T: Trait> Module<T> {
 		let mut kpis_conversions = Kpis {
 			final_count: 0,
 			cost: 0,
+			budget_utilisation: 0,
 			zdmp: 0,
 			platform: 0,
 			client: 0
@@ -268,14 +272,26 @@ impl<T: Trait> Module<T> {
 
 		let campaign = <Campaigns>::get(&aggregated_data.campaign_id);
 		let reconciliation_threshold = campaign.reconciliation_threshold;
+		let total_budget = campaign.total_budget;
+		let decimals = campaign.decimals;
+		let (cpc_applies, cpc_val) = campaign.cpc;
+		let (cpm_applies, cpm_val) = campaign.cpm;
+		let (cpl_applies, cpl_val) = campaign.cpl;
 		let percentage_threshold: FixedU128 = FixedU128::from_inner(reconciliation_threshold) / FixedU128::from_inner(100);
 
-		// Impressions
-		Self::run_reconciliation(&aggregated_data, &mut record.impressions, percentage_threshold);
 		// Clicks
 		Self::run_reconciliation(&aggregated_data, &mut record.clicks, percentage_threshold);
+		let cliks_budget_utilization = if cpc_applies == true { Self::update_costs(&mut record.clicks, total_budget, cpc_val, decimals) } else { 0 };
 		// Conversions
 		Self::run_reconciliation(&aggregated_data, &mut record.conversions, percentage_threshold);
+		let conversions_budget_utilization = if cpl_applies == true { Self::update_costs(&mut record.conversions, total_budget, cpl_val, decimals) } else { 0 };
+		// Impressions
+		Self::run_reconciliation(&aggregated_data, &mut record.impressions, percentage_threshold);
+		let impressions_budget_utilization = if cpm_applies == true { Self::update_costs(&mut record.impressions, total_budget, cpm_val/1000, decimals) } else { 0 };
+
+		// Update 'budget_utilization' and 'amount_spent'
+		record.budget_utilisation = cliks_budget_utilization + conversions_budget_utilization + impressions_budget_utilization;
+		record.amount_spent = Self::multiply(record.budget_utilisation, total_budget, decimals) / 100;
 
 		<ReconciledDataStore>::insert(&date_campaign, &aggregated_data.platform, record);
 	}
@@ -319,8 +335,6 @@ impl<T: Trait> Module<T> {
 			}
 		}
 
-		debug::info!("Final Count U128 {:?}", kpi.final_count);
-
 		let count_final: FixedU128 = FixedU128::from_inner(*(&kpi.final_count)* QUINTILLION);
 		let count_client: FixedU128 = FixedU128::from_inner(*(&kpi.client)* QUINTILLION);
 
@@ -333,16 +347,22 @@ impl<T: Trait> Module<T> {
 		} else if (kpi.client == 0 && kpi.zdmp == 0 && kpi.platform == 0) {
 			kpi.final_count = 0;
 		}
+	}
 
-		// debug::info!("Percentage Threshold {:?}", percentage_threshold);
-		// debug::info!("Impresions ZDMP {:?}", *(&kpi.zdmp));
-		// debug::info!("Impresions ZDMP U128 {:?}", count_zdmp);
-		// debug::info!("Impressions ZDMP Threshold U128 {:?}", count_zdmp_threshold);
+	fn update_costs(
+		kpi: &mut Kpis,
+		total_budget: u128,
+		factor: u128,
+		decimals: u32
+	) -> u128 {
+		kpi.cost = Self::multiply(kpi.final_count * 10u128.pow(decimals), factor, decimals);
+		kpi.budget_utilisation = Self::divide(kpi.cost, total_budget, decimals) * 100;
+		return kpi.budget_utilisation
 	}
 
 	fn divide(a: u128, b: u128, decimals: u32) -> u128 {
 		let factor = 10u128.pow(decimals);
-		return (a * factor) / b
+		return (a * factor/ b)
 	}
 
 	fn multiply(a: u128, b: u128, decimals: u32) -> u128 {
