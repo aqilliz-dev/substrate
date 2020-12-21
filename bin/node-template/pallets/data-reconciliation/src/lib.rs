@@ -123,17 +123,6 @@ decl_event! {
     }
 }
 
-// decl_error! {
-// 	pub enum Error for Module<T: Trait> {
-// 		/// Campaign ID does not exist
-// 		// CampaignDoesNotExist,
-
-// 		// /// The value cannot be incremented further because it has reached the maimum allowed value
-// 		// MaxValueReached,
-// 	}
-// }
-
-
 decl_module! {
 	/// The module declaration.
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
@@ -187,7 +176,7 @@ decl_module! {
 					date_campaign.extend(b"-".to_vec());
 					date_campaign.extend(campaign_id);
 
-					Self::calculate_reconciled_data(&date_campaign, &aggregated_data);
+					Self::update_recociled_data_record(&date_campaign, &aggregated_data);
 
 					let event = <T as Trait>::Event::from(RawEvent::AggregatedDataProcessed(sender, aggregated_data, false, b"".to_vec()));
 					frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
@@ -210,16 +199,6 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-	fn calculate_reconciled_data(date_campaign: &DateCampaign, aggregated_data: &AggregatedData) {
-		let campaign_date_platform_exists = <ReconciledDataStore>::contains_key(&date_campaign, &aggregated_data.platform);
-
-		if campaign_date_platform_exists == false {
-			Self::create_recociled_data_record(&date_campaign, &aggregated_data);
-		} else {
-			Self::update_recociled_data_record(&date_campaign, &aggregated_data)
-		}
-	}
-
 	fn create_recociled_data_record(date_campaign: &DateCampaign, aggregated_data: &AggregatedData) {
 		let mut kpis_impressions = Kpis {
 			final_count: 0,
@@ -266,6 +245,12 @@ impl<T: Trait> Module<T> {
 	}
 
 	fn update_recociled_data_record(date_campaign: &DateCampaign, aggregated_data: &AggregatedData) {
+		let campaign_date_platform_exists = <ReconciledDataStore>::contains_key(&date_campaign, &aggregated_data.platform);
+
+		if !campaign_date_platform_exists {
+			Self::create_recociled_data_record(&date_campaign, &aggregated_data);
+		}
+
 		let mut record = <ReconciledDataStore>::get(&date_campaign, &aggregated_data.platform);
 
 		Self::update_kpis(&aggregated_data, &mut record.impressions, &mut record.clicks, &mut record.conversions);
@@ -281,13 +266,13 @@ impl<T: Trait> Module<T> {
 
 		// Clicks
 		Self::run_reconciliation(&aggregated_data, &mut record.clicks, percentage_threshold);
-		let cliks_budget_utilization = if cpc_applies == true { Self::update_costs(&mut record.clicks, total_budget, cpc_val, decimals) } else { 0 };
+		let cliks_budget_utilization = if cpc_applies { Self::update_costs(&mut record.clicks, total_budget, cpc_val, decimals) } else { 0 };
 		// Conversions
 		Self::run_reconciliation(&aggregated_data, &mut record.conversions, percentage_threshold);
-		let conversions_budget_utilization = if cpl_applies == true { Self::update_costs(&mut record.conversions, total_budget, cpl_val, decimals) } else { 0 };
+		let conversions_budget_utilization = if cpl_applies { Self::update_costs(&mut record.conversions, total_budget, cpl_val, decimals) } else { 0 };
 		// Impressions
 		Self::run_reconciliation(&aggregated_data, &mut record.impressions, percentage_threshold);
-		let impressions_budget_utilization = if cpm_applies == true { Self::update_costs(&mut record.impressions, total_budget, cpm_val/1000, decimals) } else { 0 };
+		let impressions_budget_utilization = if cpm_applies { Self::update_costs(&mut record.impressions, total_budget, cpm_val/1000, decimals) } else { 0 };
 
 		// Update 'budget_utilization' and 'amount_spent'
 		record.budget_utilisation = cliks_budget_utilization + conversions_budget_utilization + impressions_budget_utilization;
