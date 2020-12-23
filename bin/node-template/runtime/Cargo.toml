@@ -115,5 +115,6 @@ runtime-benchmarks = [
 	"provenance-ledger/runtime-benchmarks",
 	"pallet-contracts/runtime-benchmarks",
 	"pallet-scheduler/runtime-benchmarks",
+	'data-reconciliation/runtime-benchmarks',
 	# "pallet-session-benchmarking",
 ]

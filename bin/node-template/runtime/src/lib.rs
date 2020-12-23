@@ -305,6 +305,7 @@ impl provenance_ledger::Trait for Runtime {
 
 impl data_reconciliation::Trait for Runtime {
 	type Event = Event;
+	type WeightInfo = weights::data_reconciliation::WeightInfo;
 }
 
 parameter_types! {
@@ -708,6 +709,7 @@ impl_runtime_apis! {
 			add_benchmark!(params, batches, provenance_ledger, ProvenanceLedger);
 			add_benchmark!(params, batches, pallet_contracts, Contracts);
 			add_benchmark!(params, batches, pallet_scheduler, Scheduler);
+			add_benchmark!(params, batches, data_reconciliation, DataReconciliation);
 			// add_benchmark!(params, batches, pallet_session, SessionBench::<Runtime>);
 
 			if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }

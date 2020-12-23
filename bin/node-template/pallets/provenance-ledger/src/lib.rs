@@ -85,7 +85,7 @@ decl_event! {
 decl_module! {
 	/// The module declaration.
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-		#[weight = 0]
+		#[weight = (T::WeightInfo::add_activity_group(), Pays::No)]
 		fn add_activity(origin, action_id: Vec<u8>, subject_ids: Vec::<Vec<u8>>) {
 			let sender = ensure_signed(origin)?;
 

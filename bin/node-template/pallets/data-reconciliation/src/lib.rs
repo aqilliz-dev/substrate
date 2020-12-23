@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[macro_use]
-// mod benchmarking;
+mod benchmarking;
 
 use frame_support::{
 	debug,
@@ -21,15 +21,16 @@ use sp_std::prelude::*;
 use log::{info};
 // use sp_runtime::RuntimeDebug;
 
-// pub trait WeightInfo {
-// 	fn add_activity_group() -> Weight;
-// }
+pub trait WeightInfo {
+	fn set_campaign() -> Weight;
+	fn set_aggregated_data() -> Weight;
+}
 
 /// The pallet's configuration trait.
 pub trait Trait: system::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
-	// type WeightInfo: WeightInfo;
+	type WeightInfo: WeightInfo;
 }
 
 const QUINTILLION: u128 = 1_000_000_000_000_000_000;
@@ -128,7 +129,7 @@ decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 		// type Error = Error<T>;
 
-		#[weight = (0, Pays::No)]
+		#[weight = (T::WeightInfo::set_campaign(), Pays::No)]
 		fn set_campaign(origin, campaign_id: CampaignId, campaign: Campaign) {
 			let sender = ensure_signed(origin)?;
 
@@ -146,7 +147,7 @@ decl_module! {
 			frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
 		}
 
-		#[weight = (0, Pays::No)]
+		#[weight = (T::WeightInfo::set_aggregated_data(), Pays::No)]
 		fn set_aggregated_data(origin, aggregated_data: AggregatedData) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 
@@ -161,9 +162,10 @@ decl_module! {
 				let campaign = <Campaigns>::get(&aggregated_data.campaign_id);
 				let campaign_platforms = campaign.platforms;
 
-				let campaign_platform_exists = match campaign_platforms.binary_search(&aggregated_data.platform) {
-					Ok(_) => true,
-					Err(_) => false
+				let campaign_platform_exists = if campaign_platforms.contains(&aggregated_data.platform) {
+					true
+				} else {
+					false
 				};
 
 				if campaign_platform_exists {
