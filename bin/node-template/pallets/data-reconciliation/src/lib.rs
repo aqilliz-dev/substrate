@@ -3,6 +3,12 @@
 #[macro_use]
 mod benchmarking;
 
+#[cfg(test)]
+mod mock;
+
+#[cfg(test)]
+mod tests;
+
 use frame_support::{
 	debug,
 	ensure,
