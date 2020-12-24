@@ -23,7 +23,8 @@ COPY . .
 
 RUN WASM_BUILD_TOOLCHAIN=nightly-2020-09-22 cargo build --release
 
-RUN cd bin/node-template/node && WASM_BUILD_TOOLCHAIN=nightly-2020-09-22 cargo build --release --features runtime-benchmarks && cd ../../..
+## Only run for benchmarking
+# RUN cd bin/node-template/node && WASM_BUILD_TOOLCHAIN=nightly-2020-09-22 cargo build --release --features runtime-benchmarks && cd ../../..
 
 RUN mkdir /aquila-node && mkdir /aquila-node/target && mkdir /aquila-node/target/release
 
