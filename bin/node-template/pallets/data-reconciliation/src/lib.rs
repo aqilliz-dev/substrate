@@ -353,12 +353,12 @@ impl<T: Trait> Module<T> {
 		return kpi.budget_utilisation
 	}
 
-	fn divide(a: u128, b: u128, decimals: u32) -> u128 {
+	pub fn divide(a: u128, b: u128, decimals: u32) -> u128 {
 		let factor = 10u128.pow(decimals);
 		return (a * factor/ b)
 	}
 
-	fn multiply(a: u128, b: u128, decimals: u32) -> u128 {
+	pub fn multiply(a: u128, b: u128, decimals: u32) -> u128 {
 		let factor = 10u128.pow(decimals);
 		return (a * b) / factor
 	}
