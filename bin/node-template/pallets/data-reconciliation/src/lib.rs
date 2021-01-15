@@ -184,7 +184,14 @@ decl_module! {
 					date_campaign.extend(b"-".to_vec());
 					date_campaign.extend(campaign_id);
 
-					Self::update_recociled_data_record(&date_campaign, &aggregated_data);
+					let failed = Self::update_recociled_data_record(&date_campaign, &aggregated_data);
+
+					if failed {
+						let event = <T as Trait>::Event::from(RawEvent::AggregatedDataProcessed(sender, aggregated_data, true, b"Aggregated data is not incremental".to_vec()));
+						frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+
+						return Ok(())
+					}
 
 					let event = <T as Trait>::Event::from(RawEvent::AggregatedDataProcessed(sender, aggregated_data, false, b"".to_vec()));
 					frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
@@ -252,7 +259,7 @@ impl<T: Trait> Module<T> {
 		<ReconciledDataStore>::insert(&date_campaign, &aggregated_data.platform, record);
 	}
 
-	fn update_recociled_data_record(date_campaign: &DateCampaign, aggregated_data: &AggregatedData) {
+	fn update_recociled_data_record(date_campaign: &DateCampaign, aggregated_data: &AggregatedData) -> bool {
 		let campaign_date_platform_exists = <ReconciledDataStore>::contains_key(&date_campaign, &aggregated_data.platform);
 
 		if !campaign_date_platform_exists {
@@ -261,7 +268,11 @@ impl<T: Trait> Module<T> {
 
 		let mut record = <ReconciledDataStore>::get(&date_campaign, &aggregated_data.platform);
 
-		Self::update_kpis(&aggregated_data, &mut record.impressions, &mut record.clicks, &mut record.conversions);
+		let failed = Self::update_kpis(&aggregated_data, &mut record.impressions, &mut record.clicks, &mut record.conversions);
+
+		if failed {
+			return true
+		}
 
 		let campaign = <Campaigns>::get(&aggregated_data.campaign_id);
 		let reconciliation_threshold = campaign.reconciliation_threshold;
@@ -274,19 +285,22 @@ impl<T: Trait> Module<T> {
 
 		// Clicks
 		Self::run_reconciliation(&aggregated_data, &mut record.clicks, percentage_threshold);
-		let cliks_budget_utilization = if cpc_applies { Self::update_costs(&mut record.clicks, total_budget, cpc_val, decimals) } else { 0 };
+		let (cliks_budget_utilization, clicks_cost) = if cpc_applies { Self::update_costs(&mut record.clicks, total_budget, cpc_val, decimals) } else { (0, 0) };
 		// Conversions
 		Self::run_reconciliation(&aggregated_data, &mut record.conversions, percentage_threshold);
-		let conversions_budget_utilization = if cpl_applies { Self::update_costs(&mut record.conversions, total_budget, cpl_val, decimals) } else { 0 };
+		let (conversions_budget_utilization, conversions_cost) = if cpl_applies { Self::update_costs(&mut record.conversions, total_budget, cpl_val, decimals) } else { (0, 0) };
 		// Impressions
 		Self::run_reconciliation(&aggregated_data, &mut record.impressions, percentage_threshold);
-		let impressions_budget_utilization = if cpm_applies { Self::update_costs(&mut record.impressions, total_budget, cpm_val/1000, decimals) } else { 0 };
+		let (impressions_budget_utilization, impressions_cost) = if cpm_applies { Self::update_costs(&mut record.impressions, total_budget, cpm_val/1000, decimals) } else { (0, 0) };
 
 		// Update 'budget_utilization' and 'amount_spent'
 		record.budget_utilisation = cliks_budget_utilization + conversions_budget_utilization + impressions_budget_utilization;
-		record.amount_spent = Self::multiply(record.budget_utilisation, total_budget, decimals) / 100;
+		// record.amount_spent = Self::multiply(record.budget_utilisation, total_budget, decimals) / 100;
+		record.amount_spent = clicks_cost + conversions_cost + impressions_cost;
 
 		<ReconciledDataStore>::insert(&date_campaign, &aggregated_data.platform, record);
+
+		return false;
 	}
 
 	fn update_kpis(
@@ -294,20 +308,42 @@ impl<T: Trait> Module<T> {
 		kpis_impressions: &mut Kpis,
 		kpis_clicks: &mut Kpis,
 		kpis_conversions: &mut Kpis
-	) {
+	) -> bool {
 		if *(&aggregated_data.source) == b"zdmp".to_vec() {
+			if (
+				aggregated_data.impressions < kpis_impressions.zdmp ||
+				aggregated_data.clicks < kpis_clicks.zdmp ||
+				aggregated_data.conversions < kpis_conversions.zdmp
+			) {
+				return true
+			}
 			kpis_impressions.zdmp = aggregated_data.impressions;
 			kpis_clicks.zdmp = aggregated_data.clicks;
 			kpis_conversions.zdmp = aggregated_data.conversions;
 		} else if *(&aggregated_data.source) == b"client".to_vec() {
+			if (
+				aggregated_data.impressions < kpis_impressions.client ||
+				aggregated_data.clicks < kpis_clicks.client ||
+				aggregated_data.conversions < kpis_conversions.client
+			) {
+				return true
+			}
 			kpis_impressions.client = aggregated_data.impressions;
 			kpis_clicks.client = aggregated_data.clicks;
 			kpis_conversions.client = aggregated_data.conversions;
 		} else {
+			if (
+				aggregated_data.impressions < kpis_impressions.platform ||
+				aggregated_data.clicks < kpis_clicks.platform ||
+				aggregated_data.conversions < kpis_conversions.platform
+			) {
+				return true
+			}
 			kpis_impressions.platform = aggregated_data.impressions;
 			kpis_clicks.platform = aggregated_data.clicks;
 			kpis_conversions.platform = aggregated_data.conversions;
 		}
+		return false
 	}
 
 	fn run_reconciliation(aggregated_data: &AggregatedData, kpi: &mut Kpis, percentage_threshold: FixedU128) {
@@ -347,10 +383,10 @@ impl<T: Trait> Module<T> {
 		total_budget: u128,
 		factor: u128,
 		decimals: u32
-	) -> u128 {
+	) -> (u128, u128) {
 		kpi.cost = Self::multiply(kpi.final_count * 10u128.pow(decimals), factor, decimals);
 		kpi.budget_utilisation = Self::divide(kpi.cost, total_budget, decimals) * 100;
-		return kpi.budget_utilisation
+		return (kpi.budget_utilisation, kpi.cost)
 	}
 
 	pub fn divide(a: u128, b: u128, decimals: u32) -> u128 {
