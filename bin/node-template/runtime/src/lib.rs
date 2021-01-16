@@ -55,6 +55,8 @@ pub use data_reconciliation;
 
 pub use ocw_fqs_request;
 
+// pub use accountset;
+
 /// An index to a block.
 pub type BlockNumber = u32;
 
@@ -308,6 +310,10 @@ impl data_reconciliation::Trait for Runtime {
 	type WeightInfo = weights::data_reconciliation::WeightInfo;
 }
 
+impl accountset::Trait for Runtime {
+    type Event = Event;
+}
+
 parameter_types! {
     pub const TombstoneDeposit: Balance = 16 * MILLICENTS;
     pub const RentByteFee: Balance = 4 * MILLICENTS;
@@ -423,6 +429,7 @@ where
 			frame_system::CheckNonce::<Runtime>::from(index),
 			frame_system::CheckWeight::<Runtime>::new(),
 			pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(tip),
+			accountset::AllowAccount::<Runtime>::new()
 		);
 
 		#[cfg_attr(not(feature = "std"), allow(unused_variables))]
@@ -480,6 +487,7 @@ construct_runtime!(
 		OcwFQSrequest: ocw_fqs_request::{Module, Call, Event<T>},
 		NodeAuthorization: pallet_node_authorization::{Module, Call, Storage, Event<T>, Config<T>},
 		DataReconciliation: data_reconciliation::{Module, Call, Storage, Event<T>},
+		AccountSet: accountset::{Module, Call, Storage, Event<T>, Config<T>},
 	}
 );
 
@@ -501,7 +509,8 @@ pub type SignedExtra = (
 	frame_system::CheckEra<Runtime>,
 	frame_system::CheckNonce<Runtime>,
 	frame_system::CheckWeight<Runtime>,
-	pallet_transaction_payment::ChargeTransactionPayment<Runtime>
+	pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
+	accountset::AllowAccount<Runtime>
 );
 /// Unchecked extrinsic type as expected by this runtime.
 pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signature, SignedExtra>;

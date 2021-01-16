@@ -11,6 +11,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "account-set"
+version = "0.4.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3988,6 +4002,7 @@ dependencies = [
 name = "node-template-runtime"
 version = "2.0.0"
 dependencies = [
+ "account-set",
  "data-reconciliation",
  "frame-benchmarking",
  "frame-executive",

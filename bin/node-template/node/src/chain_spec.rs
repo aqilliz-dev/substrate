@@ -2,7 +2,7 @@ use sp_core::{Pair, Public, sr25519};
 use node_template_runtime::{
 	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
 	SudoConfig, SystemConfig, WASM_BINARY, Signature, SessionConfig, opaque::SessionKeys,
-	ValidatorSetConfig
+	ValidatorSetConfig, AccountSetConfig
 };
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_finality_grandpa::AuthorityId as GrandpaId;
@@ -194,5 +194,10 @@ fn testnet_genesis(
 				),
 			],
 		}),
+		accountset: Some(AccountSetConfig {
+			allowed_accounts: vec![
+				(get_account_id_from_seed::<sr25519::Public>("Alice"), ()),
+				(get_account_id_from_seed::<sr25519::Public>("Bob"), ())],
+    	}),
 	}
 }

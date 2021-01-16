@@ -13,6 +13,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 [dependencies]
 codec = { package = "parity-scale-codec", version = "1.3.4", default-features = false, features = ["derive"] }
 validatorset = { package = "validator-set", path = "../pallets/validator-set", default-features = false }
+accountset = { package = 'account-set', path = "../pallets/account-set", default-features = false }
 
 pallet-aura = { version = "2.0.0", default-features = false, path = "../../../frame/aura" }
 pallet-balances = { version = "2.0.0", default-features = false, path = "../../../frame/balances" }
@@ -101,7 +102,8 @@ std = [
 	'pallet-node-authorization/std',
 	"pallet-session/std",
 	'ocw-fqs-request/std',
-	'validatorset/std'
+	'validatorset/std',
+	'accountset/std'
 ]
 runtime-benchmarks = [
 	"sp-runtime/runtime-benchmarks",
