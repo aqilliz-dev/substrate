@@ -24,6 +24,8 @@ use sp_runtime::{
     traits::{SignedExtension, DispatchInfoOf, Dispatchable}
 };
 
+use log::{info};
+
 pub trait Trait: system::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
@@ -139,6 +141,9 @@ impl<T: Trait + Send + Sync> SignedExtension for AllowAccount<T> where
 		_len: usize,
     ) -> TransactionValidity {
         if <AllowedAccounts<T>>::contains_key(who) {
+			log::info!("============== Info value ============== {:?}", info);
+			log::info!("============== Self ============== {:?}", self);
+			log::info!("============== Call ============== {:?}", _call);
             Ok(ValidTransaction {
                 priority: info.weight as TransactionPriority,
                 longevity: TransactionLongevity::max_value(),
