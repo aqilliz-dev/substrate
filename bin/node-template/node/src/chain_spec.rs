@@ -185,7 +185,7 @@ fn testnet_genesis(
 		pallet_node_authorization: Some(NodeAuthorizationConfig {
 			nodes: vec![
 				(
-					OpaquePeerId(bs58::decode("12D3KooWDeyKmW2ri7qsR19eL6FdgHeJ517U8KLrQHqepy229KhR").into_vec().unwrap()),
+					OpaquePeerId(bs58::decode("12D3KooWEJW4z7qbQs56YfAUFfYXxoe1chKquE3aKa56GSoyFvoT").into_vec().unwrap()),
 					endowed_accounts[0].clone()
 				),
 				(
