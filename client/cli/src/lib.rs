@@ -44,6 +44,7 @@ use structopt::{
 	StructOpt,
 };
 use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::fmt::{self, format, time};
 
 /// Substrate client CLI
 ///
@@ -274,12 +275,14 @@ pub fn init_logger(
 	let isatty = atty::is(atty::Stream::Stderr);
 	let enable_color = isatty;
 
+	let fmt = format::json().flatten_event(true);
+
 	let subscriber = tracing_subscriber::FmtSubscriber::builder()
 		.with_env_filter(env_filter)
+		.event_format(fmt)
+		.with_timer(time::ChronoUtc::rfc3339())
 		.with_target(false)
-		.with_ansi(enable_color)
 		.with_writer(std::io::stderr)
-		.compact()
 		.finish();
 
 	if let Some(tracing_targets) = tracing_targets {
