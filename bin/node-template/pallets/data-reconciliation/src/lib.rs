@@ -65,6 +65,7 @@ pub struct Campaign {
 	cpc: (bool, u128),
 	cpm: (bool, u128),
 	cpl: (bool, u128),
+	timezone: Vec<u8>
 }
 
 #[derive(Encode, Decode, Clone, Default, RuntimeDebug, PartialEq, Eq)]
