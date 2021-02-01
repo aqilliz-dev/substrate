@@ -12,7 +12,6 @@ use frame_system::{self as system, ensure_signed};
 use sp_core::Hasher;
 use codec::Encode;
 use sp_std::prelude::*;
-use log::{info};
 
 pub trait WeightInfo {
 	fn add_activity_group() -> Weight;

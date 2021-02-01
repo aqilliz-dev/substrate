@@ -44,7 +44,7 @@ use structopt::{
 	StructOpt,
 };
 use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::fmt::{self, format, time};
+use tracing_subscriber::fmt::{format, time};
 
 /// Substrate client CLI
 ///
@@ -272,8 +272,8 @@ pub fn init_logger(
 		}
 	}
 
-	let isatty = atty::is(atty::Stream::Stderr);
-	let enable_color = isatty;
+	// let isatty = atty::is(atty::Stream::Stderr);
+	// let enable_color = isatty;
 
 	let fmt = format::json().flatten_event(true);
 

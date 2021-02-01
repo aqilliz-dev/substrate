@@ -10,13 +10,11 @@ mod mock;
 mod tests;
 
 use frame_support::{
-	debug,
-	ensure,
 	weights::{Weight, Pays},
-    decl_module, decl_event, decl_storage, decl_error,
-	storage::{StorageDoubleMap, StorageMap, StorageValue},
+    decl_module, decl_event, decl_storage,
+	storage::{StorageDoubleMap, StorageMap},
 	codec::{Encode, Decode},
-	sp_runtime::{RuntimeDebug, Percent, FixedU128, Perquintill},
+	sp_runtime::{RuntimeDebug, FixedU128},
 	dispatch::DispatchResult
 };
 
@@ -24,8 +22,6 @@ use frame_system::{self as system, ensure_signed};
 
 use sp_core::Hasher;
 use sp_std::prelude::*;
-use log::{info};
-// use sp_runtime::RuntimeDebug;
 
 pub trait WeightInfo {
 	fn set_campaign() -> Weight;
@@ -285,13 +281,13 @@ impl<T: Trait> Module<T> {
 		let percentage_threshold: FixedU128 = FixedU128::from_inner(reconciliation_threshold) / FixedU128::from_inner(100);
 
 		// Clicks
-		Self::run_reconciliation(&aggregated_data, &mut record.clicks, percentage_threshold);
+		Self::run_reconciliation(&mut record.clicks, percentage_threshold);
 		let (cliks_budget_utilization, clicks_cost) = if cpc_applies { Self::update_costs(&mut record.clicks, total_budget, cpc_val, decimals) } else { (0, 0) };
 		// Conversions
-		Self::run_reconciliation(&aggregated_data, &mut record.conversions, percentage_threshold);
+		Self::run_reconciliation(&mut record.conversions, percentage_threshold);
 		let (conversions_budget_utilization, conversions_cost) = if cpl_applies { Self::update_costs(&mut record.conversions, total_budget, cpl_val, decimals) } else { (0, 0) };
 		// Impressions
-		Self::run_reconciliation(&aggregated_data, &mut record.impressions, percentage_threshold);
+		Self::run_reconciliation(&mut record.impressions, percentage_threshold);
 		let (impressions_budget_utilization, impressions_cost) = if cpm_applies { Self::update_costs(&mut record.impressions, total_budget, cpm_val/1000, decimals) } else { (0, 0) };
 
 		// Update 'budget_utilization' and 'amount_spent'
@@ -311,33 +307,33 @@ impl<T: Trait> Module<T> {
 		kpis_conversions: &mut Kpis
 	) -> bool {
 		if *(&aggregated_data.source) == b"zdmp".to_vec() {
-			if (
+			if
 				aggregated_data.impressions < kpis_impressions.zdmp ||
 				aggregated_data.clicks < kpis_clicks.zdmp ||
 				aggregated_data.conversions < kpis_conversions.zdmp
-			) {
+			{
 				return true
 			}
 			kpis_impressions.zdmp = aggregated_data.impressions;
 			kpis_clicks.zdmp = aggregated_data.clicks;
 			kpis_conversions.zdmp = aggregated_data.conversions;
 		} else if *(&aggregated_data.source) == b"client".to_vec() {
-			if (
+			if
 				aggregated_data.impressions < kpis_impressions.client ||
 				aggregated_data.clicks < kpis_clicks.client ||
 				aggregated_data.conversions < kpis_conversions.client
-			) {
+			{
 				return true
 			}
 			kpis_impressions.client = aggregated_data.impressions;
 			kpis_clicks.client = aggregated_data.clicks;
 			kpis_conversions.client = aggregated_data.conversions;
 		} else {
-			if (
+			if
 				aggregated_data.impressions < kpis_impressions.platform ||
 				aggregated_data.clicks < kpis_clicks.platform ||
 				aggregated_data.conversions < kpis_conversions.platform
-			) {
+			{
 				return true
 			}
 			kpis_impressions.platform = aggregated_data.impressions;
@@ -347,7 +343,7 @@ impl<T: Trait> Module<T> {
 		return false
 	}
 
-	fn run_reconciliation(aggregated_data: &AggregatedData, kpi: &mut Kpis, percentage_threshold: FixedU128) {
+	fn run_reconciliation(kpi: &mut Kpis, percentage_threshold: FixedU128) {
 		let count_zdmp: FixedU128 = FixedU128::from_inner(*(&kpi.zdmp)* QUINTILLION);
 		let count_platform: FixedU128 = FixedU128::from_inner(*(&kpi.platform)* QUINTILLION);
 
@@ -355,12 +351,12 @@ impl<T: Trait> Module<T> {
 		let count_zdmp_ceil = count_zdmp + count_zdmp_threshold;
 		let count_zdmp_floor = count_zdmp - count_zdmp_threshold;
 
-		if (kpi.platform != 0 && kpi.zdmp != 0 && (count_platform <= count_zdmp_ceil) && (count_platform >= count_zdmp_floor)) {
+		if kpi.platform != 0 && kpi.zdmp != 0 && (count_platform <= count_zdmp_ceil) && (count_platform >= count_zdmp_floor) {
 			kpi.final_count = kpi.platform;
 		} else {
-			if (kpi.zdmp != 0) {
+			if kpi.zdmp != 0 {
 				kpi.final_count = kpi.zdmp;
-			} else if (kpi.platform != 0) {
+			} else if kpi.platform != 0 {
 				kpi.final_count = kpi.platform;
 			}
 		}
@@ -372,9 +368,9 @@ impl<T: Trait> Module<T> {
 		let count_final_ceil = count_final + count_final_threshold;
 		let count_final_floor = count_final - count_final_threshold;
 
-		if (kpi.client != 0 && kpi.final_count != 0 && (count_client <= count_final_ceil) && (count_client >= count_final_floor)) {
+		if kpi.client != 0 && kpi.final_count != 0 && (count_client <= count_final_ceil) && (count_client >= count_final_floor) {
 			kpi.final_count = kpi.client;
-		} else if (kpi.client == 0 && kpi.zdmp == 0 && kpi.platform == 0) {
+		} else if kpi.client == 0 && kpi.zdmp == 0 && kpi.platform == 0 {
 			kpi.final_count = 0;
 		}
 	}
@@ -392,7 +388,7 @@ impl<T: Trait> Module<T> {
 
 	pub fn divide(a: u128, b: u128, decimals: u32) -> u128 {
 		let factor = 10u128.pow(decimals);
-		return (a * factor/ b)
+		return a * factor/ b
 	}
 
 	pub fn multiply(a: u128, b: u128, decimals: u32) -> u128 {

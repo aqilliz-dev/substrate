@@ -24,8 +24,6 @@ use sp_runtime::{
     traits::{SignedExtension, DispatchInfoOf, Dispatchable}
 };
 
-use log::{info};
-
 pub trait Trait: system::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
