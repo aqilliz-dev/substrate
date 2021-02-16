@@ -3608,6 +3608,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "mw-reconciliation"
+version = "2.0.0"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "nalgebra"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4012,6 +4027,7 @@ dependencies = [
  "frame-system-benchmarking",
  "frame-system-rpc-runtime-api",
  "hex-literal",
+ "mw-reconciliation",
  "ocw-fqs-request",
  "pallet-aura",
  "pallet-balances",

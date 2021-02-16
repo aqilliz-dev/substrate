@@ -53,6 +53,8 @@ pub use provenance_ledger;
 
 pub use data_reconciliation;
 
+pub use mw_reconciliation;
+
 pub use ocw_fqs_request;
 
 // pub use accountset;
@@ -310,6 +312,11 @@ impl data_reconciliation::Trait for Runtime {
 	type WeightInfo = weights::data_reconciliation::WeightInfo;
 }
 
+impl mw_reconciliation::Trait for Runtime {
+	type Event = Event;
+	type WeightInfo = weights::mw_reconciliation::WeightInfo;
+}
+
 impl accountset::Trait for Runtime {
     type Event = Event;
 }
@@ -487,6 +494,7 @@ construct_runtime!(
 		OcwFQSrequest: ocw_fqs_request::{Module, Call, Event<T>},
 		NodeAuthorization: pallet_node_authorization::{Module, Call, Storage, Event<T>, Config<T>},
 		DataReconciliation: data_reconciliation::{Module, Call, Storage, Event<T>},
+		MwReconciliation: mw_reconciliation::{Module, Call, Storage, Event<T>},
 		AccountSet: accountset::{Module, Call, Storage, Event<T>, Config<T>},
 	}
 );
