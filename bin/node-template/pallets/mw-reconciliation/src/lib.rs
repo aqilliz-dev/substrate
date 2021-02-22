@@ -207,12 +207,21 @@ decl_module! {
 
 					if creative_exists {
 						if session_data.timestamp >= order.start_date && session_data.timestamp <= order.end_date {
-							Self::update_verified_spots(session_data.clone());
+							let billboard = <Billboards>::get(&session_data.order_id, &session_data.billboard_id);
 
-							let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, false, b"".to_vec()));
-							frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+							if session_data.duration >= billboard.spot_duration {
+								Self::update_verified_spots(session_data.clone(), billboard.clone());
 
-							Ok(())
+								let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, false, b"".to_vec()));
+								frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+
+								Ok(())
+							} else {
+								let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, true, b"Duration is lower than expected".to_vec()));
+								frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+
+								Ok(())
+							}
 						} else {
 							let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, true, b"Timestamp out of Order period range".to_vec()));
 							frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
@@ -275,10 +284,10 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-	fn update_verified_spots(session_data: SessionData) {
+	fn update_verified_spots(session_data: SessionData, billboard: Billboard) {
 		let order_date_exists = <OrdersDate>::contains_key(&session_data.order_id, &session_data.date);
 		let order_date: OrderDate;
-		let billboard = <Billboards>::get(&session_data.order_id, &session_data.billboard_id);
+		// let billboard = <Billboards>::get(&session_data.order_id, &session_data.billboard_id);
 
 		if !order_date_exists {
 			order_date = Self::create_order_date(session_data.clone());
