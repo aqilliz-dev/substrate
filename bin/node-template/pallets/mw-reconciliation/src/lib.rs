@@ -10,13 +10,21 @@
 // mod tests;
 
 use frame_support::{
+	debug,
 	weights::{Weight, Pays},
-    decl_module, decl_event, decl_storage,
+    decl_module, decl_event, decl_storage, decl_error,
 	storage::{StorageDoubleMap, StorageMap},
 	codec::{Encode, Decode},
 	sp_runtime::{RuntimeDebug, FixedU128},
-	dispatch::DispatchResult
+	dispatch::{DispatchResult, DispatchError}
 };
+
+// use chrono::prelude::*;
+// use chrono::{DateTime, TimeZone, Utc, NaiveDateTime};
+
+// use core::fmt::Write;
+// use heapless::String;
+// use heapless::consts::*;
 
 use frame_system::{self as system, ensure_signed};
 
@@ -25,7 +33,7 @@ use sp_std::prelude::*;
 
 pub trait WeightInfo {
 	fn set_order() -> Weight;
-	// fn set_aggregated_data() -> Weight;
+	fn set_session_data() -> Weight;
 }
 
 /// The pallet's configuration trait.
@@ -41,45 +49,80 @@ pub type OrderId = Vec<u8>;
 pub type SessionId = Vec<u8>;
 pub type BillboardId = Vec<u8>;
 pub type CreativeId = Vec<u8>;
+pub type Date = Vec<u8>;
+pub type OrderDate = Vec<u8>;
 pub type ErrorMessage = Vec<u8>;
 pub type Failed = bool;
 
 #[derive(Encode, Decode, Clone, Default, RuntimeDebug, PartialEq, Eq)]
-pub struct Order {
-    order_id: OrderId,
-	start_date: u32,
-	end_date: u32,
+pub struct BillboardData {
+	id: BillboardId,
+	spot_duration: u32,
+	spots_per_hour: u32,
 	total_spots: u32,
-	total_audiences: u32
+	imp_multiplier_per_day: u32
+}
+
+#[derive(Encode, Decode, Clone, Default, RuntimeDebug, PartialEq, Eq)]
+pub struct Billboard {
+	spot_duration: u32,
+	spots_per_hour: u32,
+	total_spots: u32,
+	imp_multiplier_per_day: u32
+}
+
+#[derive(Encode, Decode, Clone, Default, RuntimeDebug, PartialEq, Eq)]
+pub struct OrderData {
+	start_date: i64,
+	end_date: i64,
+	total_spots: u32,
+	total_audiences: u32,
+	creative_list: Vec::<CreativeId>,
+	target_inventory: Vec::<BillboardData>
+}
+
+#[derive(Encode, Decode, Clone, Default, RuntimeDebug, PartialEq, Eq)]
+pub struct Order {
+	start_date: i64,
+	end_date: i64,
+	total_spots: u32,
+	total_audiences: u32,
+	creative_list: Vec::<CreativeId>
 }
 
 #[derive(Encode, Decode, Clone, Default, RuntimeDebug, PartialEq, Eq)]
 pub struct SessionData {
-	session_id: SessionId,
+	id: SessionId,
 	order_id: OrderId,
 	billboard_id: BillboardId,
 	creative_id: CreativeId,
-	timestamp: u32,
+	timestamp: i64,
+	date: Date,
 	duration: u32
+}
+
+#[derive(Encode, Decode, Clone, Default, RuntimeDebug, PartialEq, Eq)]
+pub struct VerifedSpot {
+	verified_audience: u32
 }
 
 decl_storage! {
     trait Store for Module<T: Trait> as MwReconciliation {
-		/// [ID_001] -> Order
+		/// [OrderId] -> Order
         Orders get(fn get_order):
             map hasher(blake2_128_concat) OrderId => Order;
 
-		// /// [20201010][ID_001] -> true
-        // ReconciledDateCampaigns get(fn get_reconciled_date_campaigns):
-        //     double_map hasher(blake2_128_concat) Date, hasher(blake2_128_concat) CampaignId => bool;
+		/// [OrderId][BillboardId] -> Billboard
+		Billboards get(fn get_billboards):
+			double_map hasher(blake2_128_concat) OrderId, hasher(blake2_128_concat) BillboardId => Billboard;
 
-		// /// [20201010-ID_001][Platform] -> ReconciledData
-		// ReconciledDataStore get(fn get_reconciled_data):
-        //     double_map hasher(blake2_128_concat) DateCampaign, hasher(blake2_128_concat) Platform => ReconciledData;
+		/// [OrderId][Date] -> OrderDate;
+		OrdersDate get(fn get_orders_date):
+			double_map hasher(blake2_128_concat) OrderId, hasher(blake2_128_concat) Date => OrderDate;
 
-		// /// [ID_001][20201010] -> true
-		// ReconciledCampaignDates get(fn get_reconciled_campaign_dates):
-        //     double_map hasher(blake2_128_concat) CampaignId, hasher(blake2_128_concat) Date => bool;
+		/// [OrderDate][BillboardId] -> VerifiedSpot
+		VerifiedSpots get(fn get_verified_spots):
+			double_map hasher(blake2_128_concat) OrderDate, hasher(blake2_128_concat) BillboardId => VerifedSpot;
     }
 }
 
@@ -89,9 +132,16 @@ decl_event! {
 		AccountId = <T as system::Trait>::AccountId,
 	{
         /// Order is set
-        OrderSet(AccountId, OrderId, Order),
-		// /// Set Data is processed
-        // SessionDataProcessed(AccountId, SessionData, Failed, ErrorMessage),
+        OrderSet(AccountId, OrderId, OrderData),
+		/// Set Data is processed
+        SessionDataProcessed(AccountId, SessionData, Failed, ErrorMessage),
+    }
+}
+
+decl_error! {
+    pub enum Error for Module<T: Trait> {
+        /// Incorrect timestamp.
+        InvalidTimestamp,
     }
 }
 
@@ -101,230 +151,155 @@ decl_module! {
 		// type Error = Error<T>;
 
 		#[weight = (T::WeightInfo::set_order(), Pays::No)]
-		fn set_order(origin, order_id: OrderId, order: Order) {
+		fn set_order(origin, order_id: OrderId, order_data: OrderData) {
 			let sender = ensure_signed(origin)?;
 
 			// const MAX_SENSIBLE_REASON_LENGTH: usize = 16384;
 			// ensure!(reason.len() <= MAX_SENSIBLE_REASON_LENGTH, Error::<T>::ReasonTooBig);
+			let order_data_clone = order_data.clone();
+
+			let order = Order {
+				start_date: order_data_clone.start_date,
+				end_date: order_data_clone.end_date,
+				total_spots: order_data_clone.total_spots,
+				total_audiences: order_data_clone.total_audiences,
+				creative_list: order_data_clone.creative_list
+			};
 
 			<Orders>::insert(&order_id, &order);
+
+			for billboard_data in order_data.clone().target_inventory.iter() {
+				let billboard = Billboard {
+					spot_duration: billboard_data.spot_duration,
+					spots_per_hour: billboard_data.spot_duration,
+					total_spots: billboard_data.total_spots,
+					imp_multiplier_per_day: billboard_data.imp_multiplier_per_day
+				};
+				<Billboards>::insert(&order_id, &billboard_data.id, &billboard);
+			}
 
 			// Create Event Topic name
 			let mut topic_name = Vec::new();
 			topic_name.extend_from_slice(b"mw-reconciliation");
 			let topic = T::Hashing::hash(&topic_name[..]);
 
-			let event = <T as Trait>::Event::from(RawEvent::OrderSet(sender, order_id, order));
+			let event = <T as Trait>::Event::from(RawEvent::OrderSet(sender, order_id, order_data));
 			frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
 		}
 
-		// #[weight = (T::WeightInfo::set_session_data(), Pays::No)]
-		// fn set_session_data(origin, session_data: SessionData) -> DispatchResult {
-		// 	let sender = ensure_signed(origin)?;
+		#[weight = (T::WeightInfo::set_session_data(), Pays::No)]
+		fn set_session_data(origin, session_data: SessionData) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
 
-		// 	// Create Event Topic name
-		// 	let mut topic_name = Vec::new();
-		// 	topic_name.extend_from_slice(b"mw-reconciliation");
-		// 	let topic = T::Hashing::hash(&topic_name[..]);
+			// Create Event Topic name
+			let mut topic_name = Vec::new();
+			topic_name.extend_from_slice(b"mw-reconciliation");
+			let topic = T::Hashing::hash(&topic_name[..]);
 
-		// 	let order_exists = <Orders>::contains_key(&session_data.id);
+			let order_exists = <Orders>::contains_key(&session_data.order_id);
 
-		// 	if order_exists {
-		// 		let order = <Orders>::get(&session_data.id);
-		// 		let order_platforms = order.platforms;
-		// 	} else {
-		// 		let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, aggregated_data, true, "Order ID does not exist".to_vec()));
-		// 		frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+			if order_exists {
+				let billboard_exist = <Billboards>::contains_key(&session_data.order_id, &session_data.billboard_id);
 
-		// 		Ok(())
-		// 	}
-		// }
+				if billboard_exist {
+					let order = <Orders>::get(&session_data.order_id);
+					let creative_exists = order.creative_list.contains(&session_data.creative_id);
+
+					if creative_exists {
+						if session_data.timestamp >= order.start_date && session_data.timestamp <= order.end_date {
+							Self::update_verified_spots(session_data.clone());
+
+							let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, false, b"".to_vec()));
+							frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+
+							Ok(())
+						} else {
+							let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, true, b"Timestamp out of Order period range".to_vec()));
+							frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+
+							Ok(())
+						}
+					} else {
+						let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, true, b"Creative ID does not exist".to_vec()));
+						frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+
+						Ok(())
+					}
+				} else {
+					let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, true, b"Billboard ID does not exist".to_vec()));
+					frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+
+					Ok(())
+				}
+
+				// // let naive_datetime = NaiveDateTime::from_timestamp(session_data.timestamp, 0);
+				// // let datetime: DateTime<Utc> = DateTime::from_utc(naive_datetime, Utc);
+
+				// // let year = datetime.year().to_ne_bytes();
+				// // let year = 1234_i32.to_str().into_bytes();
+				// let year = 1234_i32;
+				// let a: u32 = year as u32;
+				// let mut data = String::<U32>::from("");
+				// let year_good = write!(data,"{}", a);
+
+				// let ola = match year_good {
+				// 	Ok(ola) => ola,
+				// 	// Err(_) => return Result<(), DispatchError::BadOrigin>,
+				// 	Err(_) => return Err(Error::<T>::InvalidTimestamp)?,
+				// };
+				// // let b: String = a.to_string();
+				// 		// let year = datetime.year().to_ne_bytes();
+				// // let a = &year;
+				// // let month = datetime.month();
+				// // let day = datetime.day();
+
+				// // // let dt = Utc.timestamp(session_data.timestamp, 0).to_string();
+				// // // let dt = Utc.timestamp(1613644930, 0).to_rfc2822();
+				// // // let dt = Utc::now().to_string();
+				// // let pis = Utc.timestamp(1613644930, 0);
+			 	// // let lol = TimeZone::offset_from_utc_datetime(utc: &pis);
+
+				// // let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), lol);
+				// // let caca = dt.to_rfc2822();
+
+				// let date_time_after_a_billion_seconds = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc);
+				// let a = date_time_after_a_billion_seconds.format("%a %b %e %T %Y").to_string();
+			} else {
+				let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, true, b"Order ID does not exist".to_vec()));
+				frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+
+				Ok(())
+			}
+		}
 	}
 }
 
-// impl<T: Trait> Module<T> {
-// 	fn create_recociled_data_record(date_campaign: &DateCampaign, aggregated_data: &AggregatedData) {
-// 		let mut kpis_impressions = Kpis {
-// 			final_count: 0,
-// 			cost: 0,
-// 			budget_utilisation: 0,
-// 			zdmp: 0,
-// 			platform: 0,
-// 			client: 0
-// 		};
+impl<T: Trait> Module<T> {
+	fn update_verified_spots(session_data: SessionData) {
+		let order_date_exists = <OrdersDate>::contains_key(&session_data.order_id, &session_data.date);
+		let order_date: OrderDate;
+		let billboard = <Billboards>::get(&session_data.order_id, &session_data.billboard_id);
 
-// 		let mut kpis_clicks = Kpis {
-// 			final_count: 0,
-// 			cost: 0,
-// 			budget_utilisation: 0,
-// 			zdmp: 0,
-// 			platform: 0,
-// 			client: 0
-// 		};
+		if !order_date_exists {
+			order_date = Self::create_order_date(session_data.clone());
+		} else {
+			order_date = <OrdersDate>::get(&session_data.order_id, &session_data.date);
+		}
 
-// 		let mut kpis_conversions = Kpis {
-// 			final_count: 0,
-// 			cost: 0,
-// 			budget_utilisation: 0,
-// 			zdmp: 0,
-// 			platform: 0,
-// 			client: 0
-// 		};
+		let mut verified_spot = <VerifiedSpots>::get(&order_date, &session_data.billboard_id);
+		verified_spot.verified_audience += billboard.imp_multiplier_per_day;
 
-// 		Self::update_kpis(&aggregated_data, &mut kpis_impressions, &mut kpis_clicks, &mut kpis_conversions);
+		<VerifiedSpots>::insert(&order_date, &session_data.billboard_id, verified_spot);
+	}
 
-// 		kpis_impressions.final_count = *(&aggregated_data.impressions);
-// 		kpis_clicks.final_count = *(&aggregated_data.clicks);
-// 		kpis_conversions.final_count = *(&aggregated_data.conversions);
+	fn create_order_date(session_data: SessionData) -> OrderDate {
+		let mut order_date = session_data.clone().order_id;
+		let date = session_data.clone().date;
 
-// 		let record = ReconciledData {
-// 			amount_spent: 0,
-// 			budget_utilisation: 0,
-// 			impressions: kpis_impressions,
-// 			clicks: kpis_clicks,
-// 			conversions: kpis_conversions
-// 		};
+		order_date.extend(b"-".to_vec());
+		order_date.extend(date);
 
-// 		<ReconciledDataStore>::insert(&date_campaign, &aggregated_data.platform, record);
-// 	}
-
-// 	fn update_recociled_data_record(date_campaign: &DateCampaign, aggregated_data: &AggregatedData) -> bool {
-// 		let campaign_date_platform_exists = <ReconciledDataStore>::contains_key(&date_campaign, &aggregated_data.platform);
-
-// 		if !campaign_date_platform_exists {
-// 			Self::create_recociled_data_record(&date_campaign, &aggregated_data);
-// 		}
-
-// 		let mut record = <ReconciledDataStore>::get(&date_campaign, &aggregated_data.platform);
-
-// 		let failed = Self::update_kpis(&aggregated_data, &mut record.impressions, &mut record.clicks, &mut record.conversions);
-
-// 		if failed {
-// 			return true
-// 		}
-
-// 		let campaign = <Campaigns>::get(&aggregated_data.campaign_id);
-// 		let reconciliation_threshold = campaign.reconciliation_threshold;
-// 		let total_budget = campaign.total_budget;
-// 		let decimals = campaign.decimals;
-// 		let (cpc_applies, cpc_val) = campaign.cpc;
-// 		let (cpm_applies, cpm_val) = campaign.cpm;
-// 		let (cpl_applies, cpl_val) = campaign.cpl;
-// 		let percentage_threshold: FixedU128 = FixedU128::from_inner(reconciliation_threshold) / FixedU128::from_inner(100);
-
-// 		// Clicks
-// 		Self::run_reconciliation(&mut record.clicks, percentage_threshold);
-// 		let (cliks_budget_utilization, clicks_cost) = if cpc_applies { Self::update_costs(&mut record.clicks, total_budget, cpc_val, decimals) } else { (0, 0) };
-// 		// Conversions
-// 		Self::run_reconciliation(&mut record.conversions, percentage_threshold);
-// 		let (conversions_budget_utilization, conversions_cost) = if cpl_applies { Self::update_costs(&mut record.conversions, total_budget, cpl_val, decimals) } else { (0, 0) };
-// 		// Impressions
-// 		Self::run_reconciliation(&mut record.impressions, percentage_threshold);
-// 		let (impressions_budget_utilization, impressions_cost) = if cpm_applies { Self::update_costs(&mut record.impressions, total_budget, cpm_val/1000, decimals) } else { (0, 0) };
-
-// 		// Update 'budget_utilization' and 'amount_spent'
-// 		record.budget_utilisation = cliks_budget_utilization + conversions_budget_utilization + impressions_budget_utilization;
-// 		// record.amount_spent = Self::multiply(record.budget_utilisation, total_budget, decimals) / 100;
-// 		record.amount_spent = clicks_cost + conversions_cost + impressions_cost;
-
-// 		<ReconciledDataStore>::insert(&date_campaign, &aggregated_data.platform, record);
-
-// 		return false;
-// 	}
-
-// 	fn update_kpis(
-// 		aggregated_data: &AggregatedData,
-// 		kpis_impressions: &mut Kpis,
-// 		kpis_clicks: &mut Kpis,
-// 		kpis_conversions: &mut Kpis
-// 	) -> bool {
-// 		if *(&aggregated_data.source) == b"zdmp".to_vec() {
-// 			if
-// 				aggregated_data.impressions < kpis_impressions.zdmp ||
-// 				aggregated_data.clicks < kpis_clicks.zdmp ||
-// 				aggregated_data.conversions < kpis_conversions.zdmp
-// 			{
-// 				return true
-// 			}
-// 			kpis_impressions.zdmp = aggregated_data.impressions;
-// 			kpis_clicks.zdmp = aggregated_data.clicks;
-// 			kpis_conversions.zdmp = aggregated_data.conversions;
-// 		} else if *(&aggregated_data.source) == b"client".to_vec() {
-// 			if
-// 				aggregated_data.impressions < kpis_impressions.client ||
-// 				aggregated_data.clicks < kpis_clicks.client ||
-// 				aggregated_data.conversions < kpis_conversions.client
-// 			{
-// 				return true
-// 			}
-// 			kpis_impressions.client = aggregated_data.impressions;
-// 			kpis_clicks.client = aggregated_data.clicks;
-// 			kpis_conversions.client = aggregated_data.conversions;
-// 		} else {
-// 			if
-// 				aggregated_data.impressions < kpis_impressions.platform ||
-// 				aggregated_data.clicks < kpis_clicks.platform ||
-// 				aggregated_data.conversions < kpis_conversions.platform
-// 			{
-// 				return true
-// 			}
-// 			kpis_impressions.platform = aggregated_data.impressions;
-// 			kpis_clicks.platform = aggregated_data.clicks;
-// 			kpis_conversions.platform = aggregated_data.conversions;
-// 		}
-// 		return false
-// 	}
-
-// 	fn run_reconciliation(kpi: &mut Kpis, percentage_threshold: FixedU128) {
-// 		let count_zdmp: FixedU128 = FixedU128::from_inner(*(&kpi.zdmp)* QUINTILLION);
-// 		let count_platform: FixedU128 = FixedU128::from_inner(*(&kpi.platform)* QUINTILLION);
-
-// 		let count_zdmp_threshold = count_zdmp * percentage_threshold;
-// 		let count_zdmp_ceil = count_zdmp + count_zdmp_threshold;
-// 		let count_zdmp_floor = count_zdmp - count_zdmp_threshold;
-
-// 		if kpi.platform != 0 && kpi.zdmp != 0 && (count_platform <= count_zdmp_ceil) && (count_platform >= count_zdmp_floor) {
-// 			kpi.final_count = kpi.platform;
-// 		} else {
-// 			if kpi.zdmp != 0 {
-// 				kpi.final_count = kpi.zdmp;
-// 			} else if kpi.platform != 0 {
-// 				kpi.final_count = kpi.platform;
-// 			}
-// 		}
-
-// 		let count_final: FixedU128 = FixedU128::from_inner(*(&kpi.final_count)* QUINTILLION);
-// 		let count_client: FixedU128 = FixedU128::from_inner(*(&kpi.client)* QUINTILLION);
-
-// 		let count_final_threshold = count_final * percentage_threshold;
-// 		let count_final_ceil = count_final + count_final_threshold;
-// 		let count_final_floor = count_final - count_final_threshold;
-
-// 		if kpi.client != 0 && kpi.final_count != 0 && (count_client <= count_final_ceil) && (count_client >= count_final_floor) {
-// 			kpi.final_count = kpi.client;
-// 		} else if kpi.client == 0 && kpi.zdmp == 0 && kpi.platform == 0 {
-// 			kpi.final_count = 0;
-// 		}
-// 	}
-
-// 	fn update_costs(
-// 		kpi: &mut Kpis,
-// 		total_budget: u128,
-// 		factor: u128,
-// 		decimals: u32
-// 	) -> (u128, u128) {
-// 		kpi.cost = Self::multiply(kpi.final_count * 10u128.pow(decimals), factor, decimals);
-// 		kpi.budget_utilisation = Self::divide(kpi.cost, total_budget, decimals) * 100;
-// 		return (kpi.budget_utilisation, kpi.cost)
-// 	}
-
-// 	pub fn divide(a: u128, b: u128, decimals: u32) -> u128 {
-// 		let factor = 10u128.pow(decimals);
-// 		return a * factor/ b
-// 	}
-
-// 	pub fn multiply(a: u128, b: u128, decimals: u32) -> u128 {
-// 		let factor = 10u128.pow(decimals);
-// 		return (a * b) / factor
-// 	}
-// }
+		<OrdersDate>::insert(&session_data.order_id, &session_data.date, order_date.clone());
+		order_date
+	}
+}

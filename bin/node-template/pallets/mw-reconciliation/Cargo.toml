@@ -51,6 +51,14 @@ default-features = false
 version = '2.0.0'
 path = "../../../../primitives/core"
 
+# [dependencies.chrono]
+# default-features = false
+# version = '0.4.19'
+
+# [dependencies.heapless]
+# default-features = false
+# version = '0.6.0'
+
 [dependencies]
 log = '0.4.11'
 
@@ -63,6 +71,7 @@ std = [
     'sp-std/std',
     'sp-core/std',
 	'frame-benchmarking/std',
+	# 'chrono/std',
 	# 'sp-runtime/std',
 ]
 

@@ -12,9 +12,9 @@ impl mw_reconciliation::WeightInfo for WeightInfo {
 			.saturating_add(DbWeight::get().reads(1 as Weight))
 			.saturating_add(DbWeight::get().writes(2 as Weight))
 	}
-	// fn set_aggregated_data() -> Weight {
-	// 	(205_000_000 as Weight)
-	// 		.saturating_add(DbWeight::get().reads(3 as Weight))
-	// 		.saturating_add(DbWeight::get().writes(4 as Weight))
-	// }
+	fn set_session_data() -> Weight {
+		(205_000_000 as Weight)
+			.saturating_add(DbWeight::get().reads(3 as Weight))
+			.saturating_add(DbWeight::get().writes(4 as Weight))
+	}
 }
