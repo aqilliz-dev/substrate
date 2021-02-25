@@ -50,8 +50,8 @@ impl system::Trait for Test {
 }
 
 impl WeightInfo for () {
-	fn set_campaign() -> Weight { 0 }
-	fn set_aggregated_data() -> Weight { 0 }
+	fn set_order() -> Weight { 0 }
+	// fn set_aggregated_data() -> Weight { 0 }
 }
 
 impl Trait for Test {
@@ -59,7 +59,7 @@ impl Trait for Test {
 	type WeightInfo = ();
 }
 
-pub type DataReconciliation = Module<Test>;
+pub type MwReconciliation = Module<Test>;
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {

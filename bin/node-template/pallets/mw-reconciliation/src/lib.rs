@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-// #[macro_use]
-// mod benchmarking;
+#[macro_use]
+mod benchmarking;
 
 // #[cfg(test)]
 // mod mock;
@@ -18,13 +18,6 @@ use frame_support::{
 	sp_runtime::{RuntimeDebug, FixedU128},
 	dispatch::{DispatchResult, DispatchError}
 };
-
-// use chrono::prelude::*;
-// use chrono::{DateTime, TimeZone, Utc, NaiveDateTime};
-
-// use core::fmt::Write;
-// use heapless::String;
-// use heapless::consts::*;
 
 use frame_system::{self as system, ensure_signed};
 
@@ -240,39 +233,6 @@ decl_module! {
 
 					Ok(())
 				}
-
-				// // let naive_datetime = NaiveDateTime::from_timestamp(session_data.timestamp, 0);
-				// // let datetime: DateTime<Utc> = DateTime::from_utc(naive_datetime, Utc);
-
-				// // let year = datetime.year().to_ne_bytes();
-				// // let year = 1234_i32.to_str().into_bytes();
-				// let year = 1234_i32;
-				// let a: u32 = year as u32;
-				// let mut data = String::<U32>::from("");
-				// let year_good = write!(data,"{}", a);
-
-				// let ola = match year_good {
-				// 	Ok(ola) => ola,
-				// 	// Err(_) => return Result<(), DispatchError::BadOrigin>,
-				// 	Err(_) => return Err(Error::<T>::InvalidTimestamp)?,
-				// };
-				// // let b: String = a.to_string();
-				// 		// let year = datetime.year().to_ne_bytes();
-				// // let a = &year;
-				// // let month = datetime.month();
-				// // let day = datetime.day();
-
-				// // // let dt = Utc.timestamp(session_data.timestamp, 0).to_string();
-				// // // let dt = Utc.timestamp(1613644930, 0).to_rfc2822();
-				// // // let dt = Utc::now().to_string();
-				// // let pis = Utc.timestamp(1613644930, 0);
-			 	// // let lol = TimeZone::offset_from_utc_datetime(utc: &pis);
-
-				// // let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), lol);
-				// // let caca = dt.to_rfc2822();
-
-				// let date_time_after_a_billion_seconds = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc);
-				// let a = date_time_after_a_billion_seconds.format("%a %b %e %T %Y").to_string();
 			} else {
 				let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, true, b"Order ID does not exist".to_vec()));
 				frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());

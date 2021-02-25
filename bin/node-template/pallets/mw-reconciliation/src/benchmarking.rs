@@ -5,136 +5,122 @@ use super::*;
 use frame_system::RawOrigin;
 use frame_benchmarking::{benchmarks, account};
 // use std::string::String;
-use crate::Module as DataReconciliation;
+use crate::Module as MwReconciliation;
 // use crate::{Campaign, AggregatedData, ReconciledData, Kpis};
 
 const SEED: u32 = 0;
 
 benchmarks! {
 	_ { }
-	set_campaign {
+	set_order {
+		// let r in ...;
+
 		let caller = account("caller", 0, SEED);
 
-		let size = 13;
-		let mut platforms_vec = Vec::new();
+		let mut size: u32 = 4;
+		let mut creative_list = Vec::new();
 		for i in 0..size {
-			platforms_vec.push(b"facebook".to_vec());
+			creative_list.push(b"video_1.m".to_vec());
 		}
 
-		let campaign_id = b"ID_001".to_vec();
-		let campaign_id_clone = campaign_id.clone();
+		let mut target_inventory = Vec::<BillboardData>::new();
 
-		let campaign = Campaign {
-			name: b"Coca Cola".to_vec(),
-			total_budget: 5000000000,
-			currency: b"SGD".to_vec(),
-			start_date: b"20201010".to_vec(),
-			end_date: b"20201111".to_vec(),
-			platforms: platforms_vec,
-			advertiser: b"Coca Cola Inc.".to_vec(),
-			brand: b"Coke".to_vec(),
-			reconciliation_threshold: 15,
-			decimals: 6,
-			version: 1,
-			cpc: (true, 700000),
-			cpm: (true, 2000000),
-			cpl: (true, 1400000),
+		size = 3000;
+
+		for i in 1..size {
+			let billboard_data = BillboardData {
+				id: b"BB_1".to_vec(),
+				spot_duration: 10,
+				spots_per_hour: 100,
+				total_spots: 700,
+				imp_multiplier_per_day: i
+			};
+			target_inventory.push(billboard_data);
+		}
+
+		let order_id = b"ORD_001".to_vec();
+
+		let order_data = OrderData {
+			start_date: 1614137312,
+			end_date: 1614138312,
+			total_spots: 800,
+			total_audiences: 50000,
+			creative_list,
+			target_inventory,
 		};
 
-		let campaign_clone = campaign.clone();
+		let order_data_clone = order_data.clone();
 
-	}: set_campaign(RawOrigin::Signed(caller), campaign_id, campaign)
+		let order = Order {
+			start_date: order_data.start_date,
+			end_date: order_data.end_date,
+			total_spots: order_data.total_spots,
+			total_audiences: order_data.total_audiences,
+			creative_list: order_data.creative_list
+		};
+
+	}: set_order(RawOrigin::Signed(caller), order_id.clone(), order_data_clone)
 	verify {
-		assert_eq!(DataReconciliation::<T>::get_campaign(campaign_id_clone), campaign_clone);
+		assert_eq!(MwReconciliation::<T>::get_order(order_id.clone()), order);
 	}
 
-	set_aggregated_data {
+	set_session_data {
 		let caller: T::AccountId = account("caller", 0, SEED);
 
-		let size = 13;
-		let mut platforms_vec = Vec::new();
-		for i in 0..size {
-			platforms_vec.push(b"facebook".to_vec());
-		}
+		let mut creative_list = Vec::new();
+		creative_list.push(b"video_1.m".to_vec());
 
-		let campaign_id = b"ID_001".to_vec();
-		let campaign_id_clone = campaign_id.clone();
+		let mut target_inventory = Vec::<BillboardData>::new();
 
-		let campaign = Campaign {
-			name: b"Coca Cola".to_vec(),
-			total_budget: 5000000000,
-			currency: b"SGD".to_vec(),
-			start_date: b"20201010".to_vec(),
-			end_date: b"20201111".to_vec(),
-			platforms: platforms_vec,
-			advertiser: b"Coca Cola Inc.".to_vec(),
-			brand: b"Coke".to_vec(),
-			reconciliation_threshold: 15,
-			decimals: 6,
-			version: 1,
-			cpc: (true, 700000),
-			cpm: (true, 2000000),
-			cpl: (true, 1400000),
+		let billboard_data = BillboardData {
+			id: b"BB_1".to_vec(),
+			spot_duration: 10,
+			spots_per_hour: 100,
+			total_spots: 700,
+			imp_multiplier_per_day: 1000
 		};
 
-		let campaign_clone = campaign.clone();
+		target_inventory.push(billboard_data.clone());
 
-		let aggregated_data = AggregatedData {
-			campaign_id: b"ID_001".to_vec(),
-			platform: b"facebook".to_vec(),
+		let order_id = b"ORD_001".to_vec();
+
+		let order_data = OrderData {
+			start_date: 1614137312,
+			end_date: 1614138312,
+			total_spots: 800,
+			total_audiences: 50000,
+			creative_list,
+			target_inventory,
+		};
+
+		let session_data = SessionData {
+			id: b"SD_1".to_vec(),
+			order_id: order_id.clone(),
+			billboard_id: b"BB_1".to_vec(),
+			creative_id: b"video_1.m".to_vec(),
+			timestamp: 1614137313,
 			date: b"20201010".to_vec(),
-			date_received: b"20201111".to_vec(),
-			source: b"zdmp".to_vec(),
-			impressions: 100000,
-			clicks: 30,
-			conversions: 3,
-		};
-
-		let kpis_clicks = Kpis {
-			final_count: 30,
-			cost: 21000000,
-			budget_utilisation: 420000,
-			zdmp: 30,
-			platform: 0,
-			client: 0
-		};
-
-		let kpis_impressions = Kpis {
-			final_count: 100000,
-			cost: 200000000,
-			budget_utilisation: 4000000,
-			zdmp: 100000,
-			platform: 0,
-			client: 0
-		};
-
-		let kpis_conversions = Kpis {
-			final_count: 3,
-			cost: 4200000,
-			budget_utilisation: 84000,
-			zdmp: 3,
-			platform: 0,
-			client: 0
-		};
-
-		let reconciled_data = ReconciledData {
-			amount_spent: 225200000,
-			budget_utilisation: 4504000,
-			clicks: kpis_clicks,
-			impressions: kpis_impressions,
-			conversions: kpis_conversions,
+			duration: 10
 		};
 
 		let caller_origin: <T as frame_system::Trait>::Origin = RawOrigin::Signed(caller.clone()).into();
 
-		DataReconciliation::<T>::set_campaign(caller_origin, campaign_id, campaign)?;
+		MwReconciliation::<T>::set_order(caller_origin, order_id, order_data)?;
 
-		let date_campaign = b"20201010-ID_001".to_vec();
-		let platform = aggregated_data.platform.clone();
+		let mut order_date = session_data.clone().order_id;
+		let date = session_data.clone().date;
 
-	}: set_aggregated_data(RawOrigin::Signed(caller), aggregated_data)
+		order_date.extend(b"-".to_vec());
+		order_date.extend(date);
+
+		let verified_spot = VerifedSpot {
+			verified_audience: 1000
+		};
+
+	}: set_session_data(RawOrigin::Signed(caller), session_data)
 	verify {
-		assert_eq!(DataReconciliation::<T>::get_reconciled_data(date_campaign, platform), reconciled_data);
+		// assert_eq!(MwReconciliation::<T>::get_billboards(billboard_data.id), reconciled_data);
+		assert_eq!(MwReconciliation::<T>::get_verified_spots(order_date, billboard_data.id), verified_spot);
 	}
 }
 
@@ -145,9 +131,9 @@ mod tests {
 	use frame_support::assert_ok;
 
 	#[test]
-	fn set_campaign() {
+	fn set_order() {
 		ExtBuilder::default().build().execute_with(|| {
-			assert_ok!(test_benchmark_set_campaign::<Test>());
+			assert_ok!(test_benchmark_set_order::<Test>());
 		});
 	}
 

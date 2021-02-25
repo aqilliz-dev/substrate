@@ -727,6 +727,7 @@ impl_runtime_apis! {
 			add_benchmark!(params, batches, pallet_contracts, Contracts);
 			add_benchmark!(params, batches, pallet_scheduler, Scheduler);
 			add_benchmark!(params, batches, data_reconciliation, DataReconciliation);
+			add_benchmark!(params, batches, mw_reconciliation, MwReconciliation);
 			// add_benchmark!(params, batches, pallet_session, SessionBench::<Runtime>);
 
 			if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }

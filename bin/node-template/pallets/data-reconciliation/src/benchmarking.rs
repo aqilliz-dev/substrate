@@ -39,6 +39,7 @@ benchmarks! {
 			cpc: (true, 700000),
 			cpm: (true, 2000000),
 			cpl: (true, 1400000),
+			timezone: b"timezone".to_vec(),
 		};
 
 		let campaign_clone = campaign.clone();
@@ -75,6 +76,7 @@ benchmarks! {
 			cpc: (true, 700000),
 			cpm: (true, 2000000),
 			cpl: (true, 1400000),
+			timezone: b"timezone".to_vec(),
 		};
 
 		let campaign_clone = campaign.clone();
