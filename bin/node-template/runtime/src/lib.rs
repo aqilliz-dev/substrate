@@ -312,9 +312,14 @@ impl data_reconciliation::Trait for Runtime {
 	type WeightInfo = weights::data_reconciliation::WeightInfo;
 }
 
+parameter_types! {
+	pub const MwMaxBillboards: u32 = 5000;
+}
+
 impl mw_reconciliation::Trait for Runtime {
 	type Event = Event;
 	type WeightInfo = weights::mw_reconciliation::WeightInfo;
+	type MaxBillboards = MwMaxBillboards;
 }
 
 impl accountset::Trait for Runtime {

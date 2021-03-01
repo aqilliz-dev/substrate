@@ -16,7 +16,8 @@ use frame_support::{
 	storage::{StorageDoubleMap, StorageMap},
 	codec::{Encode, Decode},
 	sp_runtime::{RuntimeDebug, FixedU128},
-	dispatch::{DispatchResult, DispatchError}
+	dispatch::{DispatchResult, DispatchError},
+	traits::{Get}
 };
 
 use frame_system::{self as system, ensure_signed};
@@ -24,8 +25,10 @@ use frame_system::{self as system, ensure_signed};
 use sp_core::Hasher;
 use sp_std::prelude::*;
 
+pub type BillboardsCount = u32;
+
 pub trait WeightInfo {
-	fn set_order() -> Weight;
+	fn set_order(r: u32) -> Weight;
 	fn set_session_data() -> Weight;
 }
 
@@ -34,6 +37,7 @@ pub trait Trait: system::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 	type WeightInfo: WeightInfo;
+	type MaxBillboards: Get<BillboardsCount>;
 }
 
 const QUINTILLION: u128 = 1_000_000_000_000_000_000;
@@ -143,7 +147,7 @@ decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 		// type Error = Error<T>;
 
-		#[weight = (T::WeightInfo::set_order(), Pays::No)]
+		#[weight = (T::WeightInfo::set_order(order_data.target_inventory.len() as u32), Pays::No)]
 		fn set_order(origin, order_id: OrderId, order_data: OrderData) {
 			let sender = ensure_signed(origin)?;
 

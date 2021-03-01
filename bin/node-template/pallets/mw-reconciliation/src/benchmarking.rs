@@ -13,11 +13,11 @@ const SEED: u32 = 0;
 benchmarks! {
 	_ { }
 	set_order {
-		// let r in ...;
+		let n in 1 .. T::MaxBillboards::get();
 
 		let caller = account("caller", 0, SEED);
 
-		let mut size: u32 = 4;
+		let mut size: u32 = 10;
 		let mut creative_list = Vec::new();
 		for i in 0..size {
 			creative_list.push(b"video_1.m".to_vec());
@@ -25,11 +25,13 @@ benchmarks! {
 
 		let mut target_inventory = Vec::<BillboardData>::new();
 
-		size = 3000;
+		size = 1;
 
-		for i in 1..size {
+		for i in 0..n {
+			let id_bytes = i.to_be_bytes();
+
 			let billboard_data = BillboardData {
-				id: b"BB_1".to_vec(),
+				id: id_bytes.to_vec(),
 				spot_duration: 10,
 				spots_per_hour: 100,
 				total_spots: 700,
