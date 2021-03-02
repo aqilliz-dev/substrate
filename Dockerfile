@@ -13,18 +13,18 @@ RUN curl https://sh.rustup.rs -sSf -y | sh
 
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-RUN rustup default stable
+RUN rustup toolchain install nightly-2020-09-27
 
-RUN rustup install nightly-2020-09-22
+RUN rustup default nightly-2020-09-27
 
-RUN rustup target add wasm32-unknown-unknown --toolchain nightly-2020-09-22
+RUN rustup target add wasm32-unknown-unknown --toolchain nightly-2020-09-27
 
 COPY . .
 
-RUN WASM_BUILD_TOOLCHAIN=nightly-2020-09-22 cargo build --release
+RUN WASM_BUILD_TOOLCHAIN=nightly-2020-09-27 cargo build --release
 
 ## Only run for benchmarking
-# RUN cd bin/node-template/node && WASM_BUILD_TOOLCHAIN=nightly-2020-09-22 cargo build --release --features runtime-benchmarks && cd ../../..
+# RUN cd bin/node-template/node && WASM_BUILD_TOOLCHAIN=nightly-2020-09-27 cargo build --release --features runtime-benchmarks && cd ../../..
 
 RUN mkdir /aquila-node && mkdir /aquila-node/target && mkdir /aquila-node/target/release
 
