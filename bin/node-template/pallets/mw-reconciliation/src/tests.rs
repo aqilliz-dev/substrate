@@ -1,305 +1,118 @@
 use crate::{mock::*};
 use super::*;
-// use crate::Module as DataReconciliation;
 use frame_support::{assert_ok, assert_noop};
 
 #[test]
-fn campaign_set() {
-	let campaign_id = b"ID_001".to_vec();
-	let campaign_id_clone = campaign_id.clone();
-
-	let size = 13;
-	let mut platforms_vec = Vec::new();
+fn order_set() {
+	let mut size: u32 = 10;
+	let mut creative_list = Vec::new();
 	for i in 0..size {
-		platforms_vec.push(b"facebook".to_vec());
+		creative_list.push(b"video_1.m".to_vec());
 	}
 
-	let campaign = Campaign {
-		name: b"Coca Cola".to_vec(),
-		total_budget: 5000000000,
-		currency: b"SGD".to_vec(),
-		start_date: b"20201010".to_vec(),
-		end_date: b"20201111".to_vec(),
-		platforms: platforms_vec,
-		advertiser: b"Coca Cola Inc.".to_vec(),
-		brand: b"Coke".to_vec(),
-		reconciliation_threshold: 15,
-		decimals: 6,
-		version: 1,
-		cpc: (true, 700000),
-		cpm: (true, 2000000),
-		cpl: (true, 1400000),
+	let mut target_inventory = Vec::<BillboardData>::new();
+
+	size = 100;
+
+	for i in 0..size {
+		let id_bytes = i.to_be_bytes();
+
+		let billboard_data = BillboardData {
+			id: id_bytes.to_vec(),
+			spot_duration: 10,
+			spots_per_hour: 100,
+			total_spots: 700,
+			imp_multiplier_per_day: i
+		};
+		target_inventory.push(billboard_data);
+	}
+
+	let order_id = b"ORD_001".to_vec();
+	let order_id_clone = order_id.clone();
+
+	let order_data = OrderData {
+		start_date: 1614137312,
+		end_date: 1614138312,
+		total_spots: 800,
+		total_audiences: 50000,
+		creative_list,
+		target_inventory,
 	};
 
-	let campaign_clone = campaign.clone();
+
+	let order_data_clone = order_data.clone();
+
+	let order = Order {
+		start_date: order_data.start_date,
+		end_date: order_data.end_date,
+		total_spots: order_data.total_spots,
+		total_audiences: order_data.total_audiences,
+		creative_list: order_data.creative_list
+	};
 
 	new_test_ext().execute_with(|| {
 		// Dispatch a signed extrinsic.
-		assert_ok!(DataReconciliation::set_campaign(Origin::signed(1),campaign_id, campaign));
+		assert_ok!(MwReconciliation::set_order(Origin::signed(1),order_id, order_data_clone));
 		// Read pallet storage and assert an expected result.
-		assert_eq!(DataReconciliation::get_campaign(campaign_id_clone), campaign_clone);
+		assert_eq!(MwReconciliation::get_order(order_id_clone), order);
 	});
 }
 
 #[test]
-fn set_aggregated_data_platform_in() {
-	let campaign_id = b"ID_001".to_vec();
-	let campaign_id_clone = campaign_id.clone();
+fn set_session_data() {
+	let mut creative_list = Vec::new();
+	creative_list.push(b"video_1.m".to_vec());
 
-	let size = 13;
-	let mut platforms_vec = Vec::new();
-	for i in 0..size {
-		platforms_vec.push(b"facebook".to_vec());
-	}
+	let mut target_inventory = Vec::<BillboardData>::new();
 
-	let campaign = Campaign {
-		name: b"Coca Cola".to_vec(),
-		total_budget: 5000000000,
-		currency: b"SGD".to_vec(),
-		start_date: b"20201010".to_vec(),
-		end_date: b"20201111".to_vec(),
-		platforms: platforms_vec,
-		advertiser: b"Coca Cola Inc.".to_vec(),
-		brand: b"Coke".to_vec(),
-		reconciliation_threshold: 15,
-		decimals: 6,
-		version: 1,
-		cpc: (true, 700000),
-		cpm: (true, 2000000),
-		cpl: (true, 1400000),
+	let billboard_data = BillboardData {
+		id: b"BB_1".to_vec(),
+		spot_duration: 10,
+		spots_per_hour: 100,
+		total_spots: 700,
+		imp_multiplier_per_day: 1000
 	};
 
-	let date_campaign = b"20201010-ID_001".to_vec();
+	target_inventory.push(billboard_data.clone());
+
+	let order_id = b"ORD_001".to_vec();
+
+	let order_data = OrderData {
+		start_date: 1614137312,
+		end_date: 1614138312,
+		total_spots: 800,
+		total_audiences: 50000,
+		creative_list,
+		target_inventory,
+	};
 
 	new_test_ext().execute_with(|| {
-		// Set Campaign
-		DataReconciliation::set_campaign(Origin::signed(1),campaign_id, campaign.clone());
-		let (exists, cpc) = campaign.clone().cpc;
+		// Set Order
+		MwReconciliation::set_order(Origin::signed(1), order_id.clone(), order_data.clone());
 
-		// Initial Aggregated Data
-		let mut aggregated_data = AggregatedData {
-			campaign_id: b"ID_001".to_vec(),
-			platform: b"facebook".to_vec(),
+		let session_data = SessionData {
+			id: b"SD_1".to_vec(),
+			order_id: order_id.clone(),
+			billboard_id: b"BB_1".to_vec(),
+			creative_id: b"video_1.m".to_vec(),
+			timestamp: 1614137313,
 			date: b"20201010".to_vec(),
-			date_received: b"20201111".to_vec(),
-			source: b"zdmp".to_vec(),
-			impressions: 0,
-			clicks: 100,
-			conversions: 0,
+			duration: 10
 		};
 
-		// ================================================== CLICKS ==================================================================
+		// Set Session Data
+		MwReconciliation::set_session_data(Origin::signed(1), session_data.clone());
 
-		//--------------------- SINGLE SOURCE - zdmp -----------------------
-		//++++++++++++++
-		// zdmp:     100
-		// platform: 0
-		// client:   0
-		// total:    100
-		//++++++++++++++
+		let mut order_date = session_data.clone().order_id;
+		let date = session_data.clone().date;
 
-		// Set Aggregated Data
-		DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
+		order_date.extend(b"-".to_vec());
+		order_date.extend(date);
 
-		// Reconciled Data
-		let single_source_reconciled_data = DataReconciliation::get_reconciled_data(date_campaign.clone(), aggregated_data.clone().platform);
+		let verified_spot = VerifedSpot {
+			verified_audience: 1000
+		};
 
-		// Test Total Count
-		assert_eq!(single_source_reconciled_data.clicks.final_count, aggregated_data.clone().clicks);
-
-		// Test Total Cost
-		let mut total_cost = DataReconciliation::multiply(aggregated_data.clone().clicks * 10u128.pow(campaign.clone().decimals), cpc, campaign.clone().decimals);
-
-		assert_eq!(
-			single_source_reconciled_data.amount_spent,
-			total_cost
-		);
-
-		// Test Budget Utilisation
-		assert_eq!(
-			single_source_reconciled_data.budget_utilisation,
-			DataReconciliation::divide(
-				DataReconciliation::multiply(
-					DataReconciliation::multiply(aggregated_data.clone().clicks * 10u128.pow(campaign.clone().decimals), cpc, campaign.clone().decimals),
-					100 * 10u128.pow(campaign.clone().decimals),
-					campaign.clone().decimals
-				),
-				campaign.clone().total_budget,
-				campaign.clone().decimals
-			)
-		);
-
-			//--------------------- DOUBLE SOURCE - zdmp + platform -----------------------
-			// _______________ Platform NOT in Reconciliation Threshold ___________________
-			//++++++++++++++
-			// zdmp:     100
-			// platform: 120
-			// client:   0
-			// total:    100
-			//++++++++++++++
-
-			// Set Aggregated Data
-			let mut previous_aggregated_data = aggregated_data.clone();
-			aggregated_data.source = b"platform".to_vec();
-			aggregated_data.clicks = 120;
-
-			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
-
-			// Reconciled Data
-			let mut double_source_reconciled_data = DataReconciliation::get_reconciled_data(date_campaign.clone(), aggregated_data.clone().platform);
-
-			// Test Total Count
-			assert_eq!(double_source_reconciled_data.clicks.final_count, previous_aggregated_data.clicks);
-
-				//--------------------- TRIPLE SOURCE - zdmp + platform + client -----------------------
-				// _______________ Client NOT in Reconciliation Threshold ___________________
-				//++++++++++++++
-				// zdmp:     100
-				// platform: 120
-				// client:   120
-				// total:    100
-				//++++++++++++++
-
-				// Set Aggregated Data
-				aggregated_data.source = b"client".to_vec();
-				aggregated_data.clicks = 120;
-
-				DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
-
-				// Reconciled Data
-				let mut triple_source_reconciled_data = DataReconciliation::get_reconciled_data(date_campaign.clone(), aggregated_data.clone().platform);
-
-				// Test Total Count
-				assert_eq!(triple_source_reconciled_data.clicks.final_count, previous_aggregated_data.clicks);
-
-				// _______________ Client IN Reconciliation Threshold ___________________
-				//++++++++++++++
-				// zdmp:     100
-				// platform: 120
-				// client:   85
-				// total:    85
-				//++++++++++++++
-
-				// Set Aggregated Data
-				aggregated_data.source = b"client".to_vec();
-				aggregated_data.clicks = 85;
-
-				DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
-
-				// Reconciled Data
-				triple_source_reconciled_data = DataReconciliation::get_reconciled_data(date_campaign.clone(), aggregated_data.clone().platform);
-
-				// Test Total Count
-				assert_eq!(triple_source_reconciled_data.clicks.final_count, aggregated_data.clicks);
-
-			// _______________ Platform IN Reconciliation Threshold ___________________
-			//++++++++++++++
-			// zdmp:     100
-			// platform: 85
-			// client:   0
-			// total:    85
-			//++++++++++++++
-
-			// Set Aggregated Data
-			aggregated_data.source = b"client".to_vec();
-			aggregated_data.clicks = 0;
-
-			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
-
-			aggregated_data.source = b"platform".to_vec();
-			aggregated_data.clicks = 85;
-
-			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
-
-			// Reconciled Data
-			double_source_reconciled_data = DataReconciliation::get_reconciled_data(date_campaign.clone(), aggregated_data.clone().platform);
-
-			// Test Total Count
-			assert_eq!(double_source_reconciled_data.clicks.final_count, aggregated_data.clicks);
-
-				//--------------------- TRIPLE SOURCE - zdmp + platform + client -----------------------
-				// _______________ Client NOT in Reconciliation Threshold ___________________
-				//++++++++++++++
-				// zdmp:     100
-				// platform: 85
-				// client:   120
-				// total:    85
-				//++++++++++++++
-
-				// Set Aggregated Data
-				previous_aggregated_data = aggregated_data.clone();
-				aggregated_data.source = b"client".to_vec();
-				aggregated_data.clicks = 120;
-
-				DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
-
-				// Reconciled Data
-				triple_source_reconciled_data = DataReconciliation::get_reconciled_data(date_campaign.clone(), aggregated_data.clone().platform);
-
-				// Test Total Count
-				assert_eq!(triple_source_reconciled_data.clicks.final_count, previous_aggregated_data.clicks);
-
-				// _______________ Client IN Reconciliation Threshold ___________________
-				//++++++++++++++
-				// zdmp:     100
-				// platform: 85
-				// client:   80
-				// total:    80
-				//++++++++++++++
-
-				// Set Aggregated Data
-				previous_aggregated_data = aggregated_data.clone();
-				aggregated_data.source = b"client".to_vec();
-				aggregated_data.clicks = 80;
-
-				DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
-
-				// Reconciled Data
-				triple_source_reconciled_data = DataReconciliation::get_reconciled_data(date_campaign.clone(), aggregated_data.clone().platform);
-
-				// Test Total Count
-				assert_eq!(triple_source_reconciled_data.clicks.final_count, aggregated_data.clicks);
-
-					// _______________ Remove Zdmp  ___________________
-					//++++++++++++++
-					// zdmp:     0
-					// platform: 85
-					// client:   80
-					// total:    80
-					//++++++++++++++
-
-					// Set Aggregated Data
-					previous_aggregated_data = aggregated_data.clone();
-					aggregated_data.source = b"zdmp".to_vec();
-					aggregated_data.clicks = 0;
-
-					DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
-
-					// Reconciled Data
-					triple_source_reconciled_data = DataReconciliation::get_reconciled_data(date_campaign.clone(), aggregated_data.clone().platform);
-
-					// Test Total Count
-					assert_eq!(triple_source_reconciled_data.clicks.final_count, previous_aggregated_data.clicks);
-
-					// _______________ Take out Client from Threshold  ___________________
-					//++++++++++++++
-					// zdmp:     0
-					// platform: 85
-					// client:   20
-					// total:    85
-					//++++++++++++++
-
-					// Set Aggregated Data
-					previous_aggregated_data = aggregated_data.clone();
-					aggregated_data.source = b"client".to_vec();
-					aggregated_data.clicks = 20;
-
-					DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
-
-					// Reconciled Data
-					triple_source_reconciled_data = DataReconciliation::get_reconciled_data(date_campaign.clone(), aggregated_data.clone().platform);
-
-					// Test Total Count
-					assert_eq!(triple_source_reconciled_data.clicks.final_count, 85);
+		assert_eq!(MwReconciliation::get_verified_spots(order_date, billboard_data.id), verified_spot);
 	});
 }

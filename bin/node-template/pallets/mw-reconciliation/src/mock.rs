@@ -19,6 +19,7 @@ parameter_types! {
 	pub const MaximumBlockWeight: Weight = 1024;
 	pub const MaximumBlockLength: u32 = 2 * 1024;
 	pub const AvailableBlockRatio: Perbill = Perbill::from_percent(75);
+	pub const MwMaxBillboards: u32 = 5000;
 }
 
 impl system::Trait for Test {
@@ -50,13 +51,14 @@ impl system::Trait for Test {
 }
 
 impl WeightInfo for () {
-	fn set_order() -> Weight { 0 }
-	// fn set_aggregated_data() -> Weight { 0 }
+	fn set_order(r: u32) -> Weight { 0 }
+	fn set_session_data() -> Weight { 0 }
 }
 
 impl Trait for Test {
 	type Event = ();
 	type WeightInfo = ();
+	type MaxBillboards = MwMaxBillboards;
 }
 
 pub type MwReconciliation = Module<Test>;

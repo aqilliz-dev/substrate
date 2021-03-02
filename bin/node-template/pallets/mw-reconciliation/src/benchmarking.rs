@@ -25,8 +25,6 @@ benchmarks! {
 
 		let mut target_inventory = Vec::<BillboardData>::new();
 
-		size = 1;
-
 		for i in 0..n {
 			let id_bytes = i.to_be_bytes();
 
