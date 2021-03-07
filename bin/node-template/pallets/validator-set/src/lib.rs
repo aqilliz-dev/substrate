@@ -2,8 +2,8 @@
 //!
 //! The Validator Set Pallet provides functionality to add/remove validators through extrinsics, in a Substrate-based
 //! PoA network.
-//! 
-//! The pallet is based on the Substrate session pallet and implements related traits for session 
+//!
+//! The pallet is based on the Substrate session pallet and implements related traits for session
 //! management when validators are added or removed.
 
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -59,8 +59,16 @@ decl_module! {
 		#[weight = 0]
 		pub fn add_validator(origin, validator_id: T::AccountId) -> dispatch::DispatchResult {
 			ensure_root(origin)?;
-			let mut validators = Self::validators().ok_or(Error::<T>::NoValidators)?;
-			validators.push(validator_id.clone());
+			// let mut validators = Self::validators().ok_or(Error::<T>::NoValidators)?;
+
+			let mut validators: Vec<T::AccountId>;
+
+			if Self::validators().is_none() {
+				validators = vec![validator_id.clone()];
+			} else {
+				validators = Self::validators().ok_or(Error::<T>::NoValidators)?;
+				validators.push(validator_id.clone());
+			}
 			<Validators<T>>::put(validators);
 			// Calling rotate_session to queue the new session keys.
 			<pallet_session::Module<T>>::rotate_session();
@@ -76,7 +84,7 @@ decl_module! {
 		pub fn remove_validator(origin, validator_id: T::AccountId) -> dispatch::DispatchResult {
 			ensure_root(origin)?;
 			let mut validators = Self::validators().ok_or(Error::<T>::NoValidators)?;
-			// Assuming that this will be a PoA network for enterprise use-cases, 
+			// Assuming that this will be a PoA network for enterprise use-cases,
 			// the validator count may not be too big; the for loop shouldn't be too heavy.
 			// In case the validator count is large, we need to find another way.
 			for (i, v) in validators.clone().into_iter().enumerate() {
