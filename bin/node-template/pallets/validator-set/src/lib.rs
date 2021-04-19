@@ -101,6 +101,14 @@ decl_module! {
 			Flag::put(true);
 			Ok(())
 		}
+
+		#[weight = 0]
+		pub fn force_change_session(origin) -> dispatch::DispatchResult {
+			ensure_root(origin)?;
+			<pallet_session::Module<T>>::rotate_session();
+			Flag::put(true);
+			Ok(())
+		}
 	}
 }
 
