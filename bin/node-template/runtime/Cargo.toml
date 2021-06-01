@@ -50,6 +50,7 @@ hex-literal = { version = "0.3.1", optional = true }
 template = { version = "2.0.0", default-features = false, path = "../pallets/template", package = "pallet-template" }
 provenance-ledger = { version = "2.0.0", default-features = false, path = "../pallets/provenance-ledger", package = "provenance-ledger" }
 data-reconciliation = { version = "2.0.0", default-features = false, path = "../pallets/data-reconciliation", package = "data-reconciliation" }
+mw-reconciliation = { version = "2.0.0", default-features = false, path = "../pallets/mw-reconciliation", package = "mw-reconciliation" }
 ocw-fqs-request = { version = "2.0.0", default-features = false, path = "./src/offchain-workers/ocw-fqs-request", package = "ocw-fqs-request" }
 
 pallet-contracts = { version = '2.0.0', default-features = false, path = "../../../frame/contracts" }
@@ -96,6 +97,7 @@ std = [
 	'provenance-ledger/std',
 	'pallet-contracts/std',
 	'data-reconciliation/std',
+	'mw-reconciliation/std',
     'pallet-contracts-primitives/std',
 	'pallet-contracts-rpc-runtime-api/std',
 	'pallet-scheduler/std',
@@ -118,5 +120,6 @@ runtime-benchmarks = [
 	"pallet-contracts/runtime-benchmarks",
 	"pallet-scheduler/runtime-benchmarks",
 	'data-reconciliation/runtime-benchmarks',
+	'mw-reconciliation/runtime-benchmarks',
 	# "pallet-session-benchmarking",
 ]

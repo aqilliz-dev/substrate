@@ -17,5 +17,6 @@
 pub mod provenance_ledger;
 pub mod pallet_balances;
 pub mod data_reconciliation;
+pub mod mw_reconciliation;
 // pub mod pallet_session;
 // pub mod pallet_democracy;

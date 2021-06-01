@@ -29,6 +29,7 @@ fn campaign_set() {
 		cpc: (true, 700000),
 		cpm: (true, 2000000),
 		cpl: (true, 1400000),
+		timezone: b"timezone".to_vec(),
 	};
 
 	let campaign_clone = campaign.clone();
@@ -67,6 +68,7 @@ fn set_aggregated_data_platform_in() {
 		cpc: (true, 700000),
 		cpm: (true, 2000000),
 		cpl: (true, 1400000),
+		timezone: b"timezone".to_vec(),
 	};
 
 	let date_campaign = b"20201010-ID_001".to_vec();
