@@ -42,13 +42,8 @@ decl_module! {
 		fn add_activity(origin, action_id: Vec<u8>, subject_ids: Vec::<Vec<u8>>) {
 			let sender = ensure_signed(origin)?;
 
-			let mut provenance_ledger = Vec::new();
-			provenance_ledger.extend_from_slice(b"provenance-ledger");
-			let topic_provenance_ledger = T::Hashing::hash(&provenance_ledger[..]);
-
-			let mut slice_sender = Vec::new();
-			slice_sender.extend_from_slice(&sender.encode()[..]);
-			let topic_sender = T::Hashing::hash(&slice_sender[..]);
+			let topic_provenance_ledger = T::Hashing::hash(b"provenance-ledger");
+			let topic_sender = T::Hashing::hash(&sender.encode());
 
 			let event = <T as Trait>::Event::from(RawEvent::ActivityAdded(sender, action_id, subject_ids));
 			frame_system::Module::<T>::deposit_event_indexed(&[topic_provenance_ledger, topic_sender], event.into());
@@ -58,13 +53,8 @@ decl_module! {
 		fn add_activity_group(origin, action_id: Vec<u8>, number_of_subject_ids: u64) {
 			let sender = ensure_signed(origin)?;
 
-			let mut provenance_ledger = Vec::new();
-			provenance_ledger.extend_from_slice(b"provenance-ledger-group");
-			let topic_provenance_ledger = T::Hashing::hash(&provenance_ledger[..]);
-
-			let mut slice_sender = Vec::new();
-			slice_sender.extend_from_slice(&sender.encode()[..]);
-			let topic_sender = T::Hashing::hash(&slice_sender[..]);
+			let topic_provenance_ledger = T::Hashing::hash(b"provenance-ledger-group");
+			let topic_sender = T::Hashing::hash(&sender.encode());
 
 			let event = <T as Trait>::Event::from(RawEvent::ActivityGroupAdded(sender, action_id, number_of_subject_ids));
 			frame_system::Module::<T>::deposit_event_indexed(&[topic_provenance_ledger, topic_sender], event.into());

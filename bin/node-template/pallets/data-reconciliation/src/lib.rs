@@ -130,8 +130,6 @@ decl_event! {
 decl_module! {
 	/// The module declaration.
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-		// type Error = Error<T>;
-
 		#[weight = (T::WeightInfo::set_campaign(), Pays::No)]
 		fn set_campaign(origin, campaign_id: CampaignId, campaign: Campaign) {
 			let sender = ensure_signed(origin)?;
@@ -142,9 +140,7 @@ decl_module! {
 			<Campaigns>::insert(&campaign_id, &campaign);
 
 			// Create Event Topic name
-			let mut topic_name = Vec::new();
-			topic_name.extend_from_slice(b"data-reconciliation");
-			let topic = T::Hashing::hash(&topic_name[..]);
+			let topic = T::Hashing::hash(b"data-reconciliation");
 
 			let event = <T as Trait>::Event::from(RawEvent::CampaignSet(sender, campaign_id, campaign));
 			frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
@@ -155,9 +151,7 @@ decl_module! {
 			let sender = ensure_signed(origin)?;
 
 			// Create Event Topic name
-			let mut topic_name = Vec::new();
-			topic_name.extend_from_slice(b"data-reconciliation");
-			let topic = T::Hashing::hash(&topic_name[..]);
+			let topic = T::Hashing::hash(b"data-reconciliation");
 
 			let campaign_exists = <Campaigns>::contains_key(&aggregated_data.campaign_id);
 
