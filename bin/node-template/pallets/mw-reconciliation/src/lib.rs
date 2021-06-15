@@ -16,7 +16,8 @@ use frame_support::{
 	storage::{StorageDoubleMap, StorageMap},
 	codec::{Encode, Decode},
 	sp_runtime::{RuntimeDebug},
-	traits::{Get}
+	traits::{Get},
+	dispatch::DispatchResult
 };
 
 use frame_system::{self as system, ensure_signed};
@@ -136,7 +137,7 @@ decl_module! {
 	/// The module declaration.
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 		#[weight = (T::WeightInfo::set_order(order_data.target_inventory.len() as u32), Pays::No)]
-		fn set_order(origin, order_id: OrderId, order_data: OrderData) {
+		fn set_order(origin, order_id: OrderId, order_data: OrderData) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 
 			// const MAX_SENSIBLE_REASON_LENGTH: usize = 16384;
@@ -170,10 +171,12 @@ decl_module! {
 
 			let event = <T as Trait>::Event::from(RawEvent::OrderSet(sender, order_id, order_data));
 			frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+
+			Ok(())
 		}
 
 		#[weight = (T::WeightInfo::set_session_data(), Pays::No)]
-		fn set_session_data(origin, session_data: SessionData) {
+		fn set_session_data(origin, session_data: SessionData) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 
 			let topic = T::Hashing::hash(b"mw-reconciliation");
@@ -190,6 +193,8 @@ decl_module! {
 
 			let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, failed, message));
 			frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+
+			Ok(())
 		}
 	}
 }
