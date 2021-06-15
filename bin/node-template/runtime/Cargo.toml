@@ -49,6 +49,7 @@ hex-literal = { version = "0.3.1", optional = true }
 
 template = { version = "2.0.0", default-features = false, path = "../pallets/template", package = "pallet-template" }
 provenance-ledger = { version = "2.0.0", default-features = false, path = "../pallets/provenance-ledger", package = "provenance-ledger" }
+stress-test = { version = "2.0.0", default-features = false, path = "../pallets/stress-test", package = "stress-test" }
 data-reconciliation = { version = "2.0.0", default-features = false, path = "../pallets/data-reconciliation", package = "data-reconciliation" }
 ocw-fqs-request = { version = "2.0.0", default-features = false, path = "./src/offchain-workers/ocw-fqs-request", package = "ocw-fqs-request" }
 
@@ -94,6 +95,7 @@ std = [
 	"frame-system-rpc-runtime-api/std",
 	"template/std",
 	'provenance-ledger/std',
+	'stress-test/std',
 	'pallet-contracts/std',
 	'data-reconciliation/std',
     'pallet-contracts-primitives/std',

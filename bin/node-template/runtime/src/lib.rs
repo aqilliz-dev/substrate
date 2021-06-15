@@ -51,6 +51,8 @@ pub use template;
 
 pub use provenance_ledger;
 
+pub use stress_test;
+
 pub use data_reconciliation;
 
 pub use ocw_fqs_request;
@@ -305,6 +307,10 @@ impl provenance_ledger::Trait for Runtime {
 	type WeightInfo = weights::provenance_ledger::WeightInfo;
 }
 
+impl stress_test::Trait for Runtime {
+	type Event = Event;
+}
+
 impl data_reconciliation::Trait for Runtime {
 	type Event = Event;
 	type WeightInfo = weights::data_reconciliation::WeightInfo;
@@ -488,6 +494,7 @@ construct_runtime!(
 		NodeAuthorization: pallet_node_authorization::{Module, Call, Storage, Event<T>, Config<T>},
 		DataReconciliation: data_reconciliation::{Module, Call, Storage, Event<T>},
 		AccountSet: accountset::{Module, Call, Storage, Event<T>, Config<T>},
+		StressTest: stress_test::{Module, Call, Storage, Event<T>},
 	}
 );
 
