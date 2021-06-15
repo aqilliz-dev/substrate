@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![feature(bool_to_option)]
 
 #[macro_use]
 mod benchmarking;
@@ -10,13 +11,11 @@ mod mock;
 mod tests;
 
 use frame_support::{
-	debug,
 	weights::{Weight, Pays},
-    decl_module, decl_event, decl_storage, decl_error,
+    decl_module, decl_event, decl_storage,
 	storage::{StorageDoubleMap, StorageMap},
 	codec::{Encode, Decode},
-	sp_runtime::{RuntimeDebug, FixedU128},
-	dispatch::{DispatchResult, DispatchError},
+	sp_runtime::{RuntimeDebug},
 	traits::{Get}
 };
 
@@ -39,8 +38,6 @@ pub trait Trait: system::Trait {
 	type WeightInfo: WeightInfo;
 	type MaxBillboards: Get<BillboardsCount>;
 }
-
-const QUINTILLION: u128 = 1_000_000_000_000_000_000;
 
 pub type OrderId = Vec<u8>;
 pub type SessionId = Vec<u8>;
@@ -135,24 +132,16 @@ decl_event! {
     }
 }
 
-decl_error! {
-    pub enum Error for Module<T: Trait> {
-        /// Incorrect timestamp.
-        InvalidTimestamp,
-    }
-}
-
 decl_module! {
 	/// The module declaration.
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-		// type Error = Error<T>;
-
 		#[weight = (T::WeightInfo::set_order(order_data.target_inventory.len() as u32), Pays::No)]
 		fn set_order(origin, order_id: OrderId, order_data: OrderData) {
 			let sender = ensure_signed(origin)?;
 
 			// const MAX_SENSIBLE_REASON_LENGTH: usize = 16384;
 			// ensure!(reason.len() <= MAX_SENSIBLE_REASON_LENGTH, Error::<T>::ReasonTooBig);
+
 			let order_data_clone = order_data.clone();
 
 			let order = Order {
@@ -165,7 +154,9 @@ decl_module! {
 
 			<Orders>::insert(&order_id, &order);
 
-			for billboard_data in order_data.clone().target_inventory.iter() {
+			let target_inventory = &order_data.target_inventory;
+
+			for billboard_data in target_inventory.iter() {
 				let billboard = Billboard {
 					spot_duration: billboard_data.spot_duration,
 					spots_per_hour: billboard_data.spot_duration,
@@ -175,83 +166,80 @@ decl_module! {
 				<Billboards>::insert(&order_id, &billboard_data.id, &billboard);
 			}
 
-			// Create Event Topic name
-			let mut topic_name = Vec::new();
-			topic_name.extend_from_slice(b"mw-reconciliation");
-			let topic = T::Hashing::hash(&topic_name[..]);
+			let topic = T::Hashing::hash(b"mw-reconciliation");
 
 			let event = <T as Trait>::Event::from(RawEvent::OrderSet(sender, order_id, order_data));
 			frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
 		}
 
 		#[weight = (T::WeightInfo::set_session_data(), Pays::No)]
-		fn set_session_data(origin, session_data: SessionData) -> DispatchResult {
+		fn set_session_data(origin, session_data: SessionData) {
 			let sender = ensure_signed(origin)?;
 
-			// Create Event Topic name
-			let mut topic_name = Vec::new();
-			topic_name.extend_from_slice(b"mw-reconciliation");
-			let topic = T::Hashing::hash(&topic_name[..]);
+			let topic = T::Hashing::hash(b"mw-reconciliation");
+			let mut message = b"".to_vec();
+			let mut failed = false;
 
-			let order_exists = <Orders>::contains_key(&session_data.order_id);
-
-			if order_exists {
-				let billboard_exist = <Billboards>::contains_key(&session_data.order_id, &session_data.billboard_id);
-
-				if billboard_exist {
-					let order = <Orders>::get(&session_data.order_id);
-					let creative_exists = order.creative_list.contains(&session_data.creative_id);
-
-					if creative_exists {
-						if session_data.timestamp >= order.start_date && session_data.timestamp <= order.end_date {
-							let billboard = <Billboards>::get(&session_data.order_id, &session_data.billboard_id);
-
-							if session_data.duration >= billboard.spot_duration {
-								Self::update_verified_spots(session_data.clone(), billboard.clone());
-
-								let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, false, b"".to_vec()));
-								frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
-
-								Ok(())
-							} else {
-								let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, true, b"Duration is lower than expected".to_vec()));
-								frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
-
-								Ok(())
-							}
-						} else {
-							let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, true, b"Timestamp out of Order period range".to_vec()));
-							frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
-
-							Ok(())
-						}
-					} else {
-						let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, true, b"Creative ID does not exist".to_vec()));
-						frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
-
-						Ok(())
-					}
-				} else {
-					let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, true, b"Billboard ID does not exist".to_vec()));
-					frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
-
-					Ok(())
-				}
-			} else {
-				let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, true, b"Order ID does not exist".to_vec()));
-				frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
-
-				Ok(())
+			match Self::check_validity(&session_data) {
+				Ok(billboard) => Self::update_verified_spots(&session_data, &billboard),
+				Err(err_message) => {
+					message = err_message;
+					failed = true;
+				},
 			}
+
+			let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, failed, message));
+			frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
 		}
 	}
 }
 
 impl<T: Trait> Module<T> {
-	fn update_verified_spots(session_data: SessionData, billboard: Billboard) {
+	fn order_exists(session_data: &SessionData) -> Result<Order, ErrorMessage> {
+		let order_id = &session_data.order_id;
+		let order = <Orders>::contains_key(order_id);
+		order.then_some(Self::get_order(order_id))
+			.ok_or(b"Order ID does not exist".to_vec())
+	}
+
+	fn billboard_exists(session_data: &SessionData) -> Result<Billboard, ErrorMessage> {
+		let order_id = &session_data.order_id;
+		let billboard_id = &session_data.billboard_id;
+		let billboard = <Billboards>::contains_key(order_id, billboard_id);
+		billboard.then_some(Self::get_billboards(order_id, billboard_id))
+			.ok_or(b"Billboard ID does not exist".to_vec())
+	}
+
+	fn creative_exists(session_data: &SessionData, order: &Order) -> Result<(), ErrorMessage> {
+		let creative = order.creative_list.contains(&session_data.creative_id);
+		creative.then_some(()).ok_or(b"Creative ID does not exist".to_vec())
+	}
+
+	fn timestamp_in_range(session_data: &SessionData, order: &Order) -> Result<(), ErrorMessage> {
+		let after_start_date = session_data.timestamp >= order.start_date;
+		let before_end_date = session_data.timestamp <= order.end_date;
+		let in_range =  after_start_date && before_end_date;
+		in_range.then_some(()).ok_or(b"Timestamp out of Order period range".to_vec())
+	}
+
+	fn enough_spot_duration(session_data: &SessionData, billboard: &Billboard) -> Result<(), ErrorMessage> {
+		let enough = session_data.duration >= billboard.spot_duration;
+		enough.then_some(()).ok_or(b"Duration is lower than expected".to_vec())
+	}
+
+	fn check_validity(session_data: &SessionData) -> Result<Billboard, ErrorMessage> {
+		let order = Self::order_exists(&session_data)?;
+		let billboard = Self::billboard_exists(&session_data)?;
+		Self::creative_exists(&session_data, &order)?;
+		Self::timestamp_in_range(&session_data, &order)?;
+		Self::enough_spot_duration(&session_data, &billboard)?;
+
+		Ok(billboard)
+	}
+
+	fn update_verified_spots(session_data: &SessionData, billboard: &Billboard) {
 		let order_date_exists = <OrdersDate>::contains_key(&session_data.order_id, &session_data.date);
 		let order_date: OrderDate;
-		// let billboard = <Billboards>::get(&session_data.order_id, &session_data.billboard_id);
 
 		if !order_date_exists {
 			order_date = Self::create_order_date(session_data.clone());
