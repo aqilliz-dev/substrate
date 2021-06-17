@@ -4,6 +4,12 @@
 #[macro_use]
 mod benchmarking;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod helpers;
+
+#[cfg(test)]
+mod helpers;
+
 #[cfg(test)]
 mod mock;
 
@@ -17,7 +23,7 @@ use frame_support::{
 	codec::{Encode, Decode},
 	sp_runtime::{RuntimeDebug},
 	traits::{Get},
-	dispatch::DispatchResult
+	dispatch::DispatchResult,
 };
 
 use frame_system::{self as system, ensure_signed};
@@ -25,7 +31,7 @@ use frame_system::{self as system, ensure_signed};
 use sp_core::Hasher;
 use sp_std::prelude::*;
 
-pub type BillboardsCount = u32;
+type BillboardsCount = u32;
 
 pub trait WeightInfo {
 	fn set_order(r: u32) -> Weight;
@@ -40,17 +46,17 @@ pub trait Trait: system::Trait {
 	type MaxBillboards: Get<BillboardsCount>;
 }
 
-pub type OrderId = Vec<u8>;
-pub type SessionId = Vec<u8>;
-pub type BillboardId = Vec<u8>;
-pub type CreativeId = Vec<u8>;
-pub type Date = Vec<u8>;
-pub type OrderDate = Vec<u8>;
-pub type ErrorMessage = Vec<u8>;
-pub type Failed = bool;
+type OrderId = Vec<u8>;
+type SessionId = Vec<u8>;
+type BillboardId = Vec<u8>;
+type CreativeId = Vec<u8>;
+type Date = Vec<u8>;
+type OrderDate = Vec<u8>;
+type ErrorMessage = Vec<u8>;
+type Failed = bool;
 
 #[derive(Encode, Decode, Clone, Default, RuntimeDebug, PartialEq, Eq)]
-pub struct BillboardData {
+struct BillboardData {
 	id: BillboardId,
 	spot_duration: u32,
 	spots_per_hour: u32,
@@ -72,8 +78,8 @@ pub struct OrderData {
 	end_date: i64,
 	total_spots: u32,
 	total_audiences: u32,
-	creative_list: Vec::<CreativeId>,
-	target_inventory: Vec::<BillboardData>
+	creative_list: Vec<CreativeId>,
+	target_inventory: Vec<BillboardData>
 }
 
 #[derive(Encode, Decode, Clone, Default, RuntimeDebug, PartialEq, Eq)]
@@ -82,7 +88,7 @@ pub struct Order {
 	end_date: i64,
 	total_spots: u32,
 	total_audiences: u32,
-	creative_list: Vec::<CreativeId>
+	creative_list: Vec<CreativeId>
 }
 
 #[derive(Encode, Decode, Clone, Default, RuntimeDebug, PartialEq, Eq)]
@@ -139,9 +145,6 @@ decl_module! {
 		#[weight = (T::WeightInfo::set_order(order_data.target_inventory.len() as u32), Pays::No)]
 		fn set_order(origin, order_id: OrderId, order_data: OrderData) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
-
-			// const MAX_SENSIBLE_REASON_LENGTH: usize = 16384;
-			// ensure!(reason.len() <= MAX_SENSIBLE_REASON_LENGTH, Error::<T>::ReasonTooBig);
 
 			let order_data_clone = order_data.clone();
 

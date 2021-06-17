@@ -52,7 +52,7 @@ pub struct Campaign {
 	currency: Vec<u8>,
 	start_date: Date,
 	end_date: Date,
-	platforms: Vec::<Platform>,
+	platforms: Vec<Platform>,
 	advertiser: Vec<u8>,
 	brand: Vec<u8>,
 	reconciliation_threshold: u128,
