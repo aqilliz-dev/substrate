@@ -10,6 +10,9 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod helpers;
+
 use frame_support::{
 	weights::{Weight, Pays},
     decl_module, decl_event, decl_storage,
@@ -37,11 +40,16 @@ pub trait Trait: system::Trait {
 }
 
 const QUINTILLION: u128 = 1_000_000_000_000_000_000;
-const DASH: &str = "-";
-const TOPIC: &str = "data-reconcilation";
-const CAMPAIGN_ERROR: &str = "Campaign ID does not exist";
-const PLATFORM_ERROR: &str = "Platform does not exist for the Campaign";
-const DATE_ERROR: &str = "Date does not exist for that Campaign and Platform";
+const DASH: &[u8] = b"-";
+const TOPIC: &[u8] = b"data-reconcilation";
+const CAMPAIGN_ERROR: &[u8] = b"Campaign ID does not exist";
+const PLATFORM_ERROR: &[u8] = b"Platform does not exist for the Campaign";
+const DATE_ERROR: &[u8] = b"Date does not exist for that Campaign and Platform";
+const DATA_ERROR: &[u8] = b"Aggregated data is not incremental";
+
+const CLIENT: &[u8] = b"client";
+const ZDMP: &[u8] = b"zdmp";
+const PLATFORM: &[u8] = b"platform";
 
 pub type CampaignId = Vec<u8>;
 pub type Platform = Vec<u8>;
@@ -146,9 +154,12 @@ decl_module! {
 			<Campaigns>::insert(&campaign_id, &campaign);
 
 			// Create Event Topic name
-			let topic = T::Hashing::hash(TOPIC.as_bytes());
+			let topic = T::Hashing::hash(TOPIC);
 
-			let event = <T as Trait>::Event::from(RawEvent::CampaignSet(sender, campaign_id, campaign));
+			let event = <T as Trait>::Event::from(
+				RawEvent::CampaignSet(sender, campaign_id, campaign)
+			);
+
 			frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
 		}
 
@@ -157,16 +168,24 @@ decl_module! {
 			let sender = ensure_signed(origin)?;
 
 			// Create Event Topic name
-			let topic = T::Hashing::hash(TOPIC.as_bytes());
+			let topic = T::Hashing::hash(TOPIC);
 			let mut message = b"".to_vec();
 			let mut failed = false;
 
 			match Self::check_validity(&aggregated_data) {
 				Err(e) => {
-					if e == DATE_ERROR.as_bytes().to_vec() {
+					if e == DATE_ERROR.to_vec() {
 						Self::create_recociled_data_record(&aggregated_data);
-						<ReconciledDateCampaigns>::insert(&aggregated_data.date, &aggregated_data.campaign_id, true);
-						<ReconciledCampaignDates>::insert(&aggregated_data.campaign_id, &aggregated_data.date, true);
+						<ReconciledDateCampaigns>::insert(
+							&aggregated_data.date,
+							&aggregated_data.campaign_id,
+							true
+						);
+						<ReconciledCampaignDates>::insert(
+							&aggregated_data.campaign_id,
+							&aggregated_data.date,
+							true
+						);
 					} else {
 						failed = true;
 						message = e;
@@ -183,7 +202,10 @@ decl_module! {
 				}
 			}
 
-			let event = <T as Trait>::Event::from(RawEvent::AggregatedDataProcessed(sender, aggregated_data, failed, message));
+			let event = <T as Trait>::Event::from(
+				RawEvent::AggregatedDataProcessed(sender, aggregated_data, failed, message)
+			);
+
 			frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
 
 			Ok(())
@@ -193,8 +215,7 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
 	fn get_date_campaign(aggregated_data: &AggregatedData) -> Vec<u8> {
-		let dash = DASH.as_bytes();
-		[&aggregated_data.date[..], &dash[..], &aggregated_data.campaign_id[..]].concat()
+		[&aggregated_data.date[..], DASH, &aggregated_data.campaign_id[..]].concat()
 	}
 
 	fn campaign_exists(
@@ -203,7 +224,7 @@ impl<T: Trait> Module<T> {
 		let campaign_id = &aggregated_data.campaign_id;
 		let campaign = <Campaigns>::contains_key(campaign_id);
 		campaign.then_some(Self::get_campaign(campaign_id))
-			.ok_or(CAMPAIGN_ERROR.as_bytes().to_vec())
+			.ok_or(CAMPAIGN_ERROR.to_vec())
 	}
 
 	fn platform_exists(
@@ -212,7 +233,7 @@ impl<T: Trait> Module<T> {
 	) -> Result<(), ErrorMessage> {
 		let platform = campaign.platforms.contains(&aggregated_data.platform);
 		platform.then_some(())
-			.ok_or(PLATFORM_ERROR.as_bytes().to_vec())
+			.ok_or(PLATFORM_ERROR.to_vec())
 	}
 
 	fn date_campaign_platform_exists(
@@ -220,9 +241,13 @@ impl<T: Trait> Module<T> {
 	) -> Result<(), ErrorMessage> {
 		let date_campaign = Self::get_date_campaign(aggregated_data);
 
-		let date_campaign_platform = <ReconciledDataStore>::contains_key(&date_campaign, &aggregated_data.platform);
+		let date_campaign_platform = <ReconciledDataStore>::contains_key(
+			&date_campaign,
+			&aggregated_data.platform
+		);
+
 		date_campaign_platform.then_some(())
-			.ok_or(DATE_ERROR.as_bytes().to_vec())
+			.ok_or(DATE_ERROR.to_vec())
 	}
 
 	fn check_validity(
@@ -264,6 +289,7 @@ impl<T: Trait> Module<T> {
 	) -> Result<(), ErrorMessage> {
 		let date_campaign = Self::get_date_campaign(aggregated_data);
 		let mut record = <ReconciledDataStore>::get(&date_campaign, &aggregated_data.platform);
+
 		Self::update_kpis(
 			&aggregated_data,
 			&mut record.impressions,
@@ -322,43 +348,49 @@ impl<T: Trait> Module<T> {
 			..
 		} = aggregated_data;
 
-		if *source == b"zdmp".to_vec() {
-			if
-				*impressions < kpis_impressions.zdmp ||
-				*clicks < kpis_clicks.zdmp ||
-				*conversions < kpis_conversions.zdmp
-			{
-				return Err(b"Aggregated data is not incremental".to_vec())
-			}
-			kpis_impressions.zdmp = *impressions;
-			kpis_clicks.zdmp = *clicks;
-			kpis_conversions.zdmp = *conversions;
-			// return Ok(())
+		let zdpm_data = (
+			ZDMP.to_vec(),
+			(kpis_impressions.zdmp, kpis_clicks.zdmp, kpis_conversions.zdmp)
+		);
+		let client_data = (
+			CLIENT.to_vec(),
+			(kpis_impressions.client, kpis_clicks.client, kpis_conversions.client)
+		);
+		let platform_data = (
+			PLATFORM.to_vec(),
+			(kpis_impressions.platform, kpis_clicks.platform, kpis_conversions.platform)
+		);
 
+		let mut kpis_collection = [&zdpm_data, &client_data, &platform_data];
 
-		} else if *source == b"client".to_vec() {
-			if
-				*impressions < kpis_impressions.client ||
-				*clicks < kpis_clicks.client ||
-				*conversions < kpis_conversions.client
-			{
-				return Err(b"Aggregated data is not incremental".to_vec())
+		for kpi in kpis_collection.iter_mut() {
+			let (kpi_source, (kpi_impressions, kpi_clicks, kpi_conversions)) = kpi;
+
+			if *source == *kpi_source {
+				if
+					*impressions < *kpi_impressions ||
+					*clicks < *kpi_clicks ||
+					*conversions < *kpi_conversions
+				{
+					return Err(DATA_ERROR.to_vec())
+				}
+
+				if *source == b"zdmp".to_vec() {
+					kpis_impressions.zdmp = *impressions;
+					kpis_clicks.zdmp = *clicks;
+					kpis_conversions.zdmp = *conversions;
+				} else if *source == b"client".to_vec() {
+					kpis_impressions.client = *impressions;
+					kpis_clicks.client = *clicks;
+					kpis_conversions.client = *conversions;
+				} else if *source == b"platform".to_vec() {
+					kpis_impressions.platform = *impressions;
+					kpis_clicks.platform = *clicks;
+					kpis_conversions.platform = *conversions;
+				}
 			}
-			kpis_impressions.client = *impressions;
-			kpis_clicks.client = *clicks;
-			kpis_conversions.client = *conversions;
-		} else {
-			if
-				*impressions < kpis_impressions.platform ||
-				*clicks < kpis_clicks.platform ||
-				*conversions < kpis_conversions.platform
-			{
-				return Err(b"Aggregated data is not incremental".to_vec())
-			}
-			kpis_impressions.platform = *impressions;
-			kpis_clicks.platform = *clicks;
-			kpis_conversions.platform = *conversions;
 		}
+
 		return Ok(())
 	}
 
