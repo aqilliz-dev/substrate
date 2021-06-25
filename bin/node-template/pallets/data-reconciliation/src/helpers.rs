@@ -29,15 +29,20 @@ pub fn get_campaign(size: usize) -> Campaign {
 	}
 }
 
-pub fn get_aggregated_data() -> AggregatedData {
+pub fn get_aggregated_data(
+	source: &[u8],
+	impressions: u128,
+	clicks: u128,
+	conversions: u128
+) -> AggregatedData {
 	AggregatedData {
-		campaign_id: b"ID_001".to_vec(),
+		campaign_id: CAMPAIGN_ID.to_vec(),
 		platform: b"facebook".to_vec(),
 		date: b"20201010".to_vec(),
 		date_received: b"20201111".to_vec(),
-		source: b"zdmp".to_vec(),
-		impressions: 0,
-		clicks: 100,
-		conversions: 0,
+		source: source.to_vec(),
+		impressions,
+		clicks,
+		conversions,
 	}
 }

@@ -30,16 +30,22 @@ fn set_aggregated_data_platform_in() {
 
 	new_test_ext().execute_with(|| {
 		// Set Campaign
-		DataReconciliation::set_campaign(
-			Origin::signed(1),
-			CAMPAIGN_ID.to_vec(),
-			campaign.clone()
+		assert_ok!(
+			DataReconciliation::set_campaign(
+				Origin::signed(1),
+				CAMPAIGN_ID.to_vec(),
+				campaign.clone()
+			)
 		);
 
-		let (_, cpc) = campaign.cpc;
+		let Campaign {
+			decimals,
+			cpc,
+			total_budget,
+			..
+		} = campaign;
 
-		// Initial Aggregated Data
-		let mut aggregated_data = get_aggregated_data();
+		let (_, cpc_value) = cpc;
 
 		// ========================= CLICKS =================================
 
@@ -51,8 +57,13 @@ fn set_aggregated_data_platform_in() {
 		// total:    100
 		//++++++++++++++
 
+		// Initial Aggregated Data
+		let mut aggregated_data = get_aggregated_data(ZDMP, 0, 100, 0);
+
 		// Set Aggregated Data
-		DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
+		assert_ok!(
+			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
+		);
 
 		// Reconciled Data
 		let single_source_reconciled_data = DataReconciliation::get_reconciled_data(
@@ -68,9 +79,9 @@ fn set_aggregated_data_platform_in() {
 
 		// Test Total Cost
 		let total_cost = DataReconciliation::multiply(
-			aggregated_data.clicks * 10u128.pow(campaign.decimals),
-			cpc,
-			campaign.decimals
+			aggregated_data.clicks * 10u128.pow(decimals),
+			cpc_value,
+			decimals
 		);
 
 		assert_eq!(
@@ -84,15 +95,15 @@ fn set_aggregated_data_platform_in() {
 			DataReconciliation::divide(
 				DataReconciliation::multiply(
 					DataReconciliation::multiply(
-						aggregated_data.clicks * 10u128.pow(campaign.decimals),
-						cpc,
-						campaign.decimals
+						aggregated_data.clicks * 10u128.pow(decimals),
+						cpc_value,
+						decimals
 					),
-					100 * 10u128.pow(campaign.decimals),
-					campaign.decimals
+					100 * 10u128.pow(decimals),
+					decimals
 				),
-				campaign.total_budget,
-				campaign.decimals
+				total_budget,
+				decimals
 			)
 		);
 
@@ -107,10 +118,12 @@ fn set_aggregated_data_platform_in() {
 
 		// Set Aggregated Data
 		let mut previous_aggregated_data = aggregated_data.clone();
-		aggregated_data.source = PLATFORM.to_vec();
-		aggregated_data.clicks = 120;
 
-		DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
+		aggregated_data = get_aggregated_data(PLATFORM, 0, 120, 0);
+
+		assert_ok!(
+			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
+		);
 
 		// Reconciled Data
 		let mut double_source_reconciled_data = DataReconciliation::get_reconciled_data(
@@ -133,10 +146,11 @@ fn set_aggregated_data_platform_in() {
 		//++++++++++++++
 
 		// Set Aggregated Data
-		aggregated_data.source = CLIENT.to_vec();
-		aggregated_data.clicks = 120;
+		aggregated_data = get_aggregated_data(CLIENT, 0, 120, 0);
 
-		DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
+		assert_ok!(
+			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
+		);
 
 		// Reconciled Data
 		let mut triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
@@ -159,10 +173,11 @@ fn set_aggregated_data_platform_in() {
 		//++++++++++++++
 
 		// Set Aggregated Data
-		aggregated_data.source = CLIENT.to_vec();
-		aggregated_data.clicks = 85;
+		aggregated_data = get_aggregated_data(CLIENT, 0, 85, 0);
 
-		DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
+		assert_ok!(
+			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
+		);
 
 		// Reconciled Data
 		triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
@@ -185,15 +200,17 @@ fn set_aggregated_data_platform_in() {
 		//++++++++++++++
 
 		// Set Aggregated Data
-		aggregated_data.source = CLIENT.to_vec();
-		aggregated_data.clicks = 0;
+		aggregated_data = get_aggregated_data(CLIENT, 0, 0, 0);
 
-		DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
+		assert_ok!(
+			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
+		);
 
-		aggregated_data.source = PLATFORM.to_vec();
-		aggregated_data.clicks = 85;
+		aggregated_data = get_aggregated_data(PLATFORM, 0, 85, 0);
 
-		DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
+		assert_ok!(
+			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
+		);
 
 		// Reconciled Data
 		double_source_reconciled_data = DataReconciliation::get_reconciled_data(
@@ -218,10 +235,11 @@ fn set_aggregated_data_platform_in() {
 
 		// Set Aggregated Data
 		previous_aggregated_data = aggregated_data.clone();
-		aggregated_data.source = CLIENT.to_vec();
-		aggregated_data.clicks = 120;
+		aggregated_data = get_aggregated_data(CLIENT, 0, 120, 0);
 
-		DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
+		assert_ok!(
+			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
+		);
 
 		// Reconciled Data
 		triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
@@ -244,11 +262,11 @@ fn set_aggregated_data_platform_in() {
 		//++++++++++++++
 
 		// Set Aggregated Data
-		// previous_aggregated_data = aggregated_data.clone();
-		aggregated_data.source = CLIENT.to_vec();
-		aggregated_data.clicks = 80;
+		aggregated_data = get_aggregated_data(CLIENT, 0, 80, 0);
 
-		DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
+		assert_ok!(
+			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
+		);
 
 		// Reconciled Data
 		triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
@@ -272,10 +290,11 @@ fn set_aggregated_data_platform_in() {
 
 		// Set Aggregated Data
 		previous_aggregated_data = aggregated_data.clone();
-		aggregated_data.source = ZDMP.to_vec();
-		aggregated_data.clicks = 0;
+		aggregated_data = get_aggregated_data(ZDMP, 0, 0, 0);
 
-		DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
+		assert_ok!(
+			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
+		);
 
 		// Reconciled Data
 		triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
@@ -298,11 +317,11 @@ fn set_aggregated_data_platform_in() {
 		//++++++++++++++
 
 		// Set Aggregated Data
-		previous_aggregated_data = aggregated_data.clone();
-		aggregated_data.source = CLIENT.to_vec();
-		aggregated_data.clicks = 20;
+		aggregated_data = get_aggregated_data(CLIENT, 0, 20, 0);
 
-		DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone());
+		assert_ok!(
+			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
+		);
 
 		// Reconciled Data
 		triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
