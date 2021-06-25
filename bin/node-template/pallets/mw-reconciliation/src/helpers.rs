@@ -1,9 +1,11 @@
 use super::*;
 
 pub const ORDER_ID: &[u8] = b"ORD_001";
+pub const BILLBOARD_ID: [u8; 4] = 0_u32.to_be_bytes();
 pub const CREATIVE_ID: &[u8] = b"video_1.m";
+pub const ORDER_DATE: &[u8] = b"ORD_001-20201010";
 
-pub fn sample_data(range: u32) -> (Vec<u8>, OrderData, Order) {
+pub fn sample_data(range: u32) -> (OrderData, Order, SessionData) {
 	let size = 10;
 	let creative_list = vec![CREATIVE_ID.to_vec(); size];
 	let mut target_inventory = Vec::<BillboardData>::new();
@@ -20,8 +22,6 @@ pub fn sample_data(range: u32) -> (Vec<u8>, OrderData, Order) {
 		};
 		target_inventory.push(billboard_data);
 	}
-
-	let order_id = ORDER_ID.to_vec();
 
 	let order_data = OrderData {
 		start_date: 1614137312,
@@ -40,5 +40,15 @@ pub fn sample_data(range: u32) -> (Vec<u8>, OrderData, Order) {
 		creative_list: order_data.creative_list.clone()
 	};
 
-	(order_id, order_data, order)
+	let session_data = SessionData {
+		id: b"SD_1".to_vec(),
+		order_id: ORDER_ID.to_vec(),
+		billboard_id: BILLBOARD_ID.to_vec(),
+		creative_id: CREATIVE_ID.to_vec(),
+		timestamp: 1614137313,
+		date: b"20201010".to_vec(),
+		duration: 10
+	};
+
+	(order_data, order, session_data)
 }
