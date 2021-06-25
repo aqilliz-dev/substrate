@@ -117,7 +117,7 @@ fn set_aggregated_data_platform_in() {
 		//++++++++++++++
 
 		// Set Aggregated Data
-		let mut previous_aggregated_data = aggregated_data.clone();
+		let previous_aggregated_data = aggregated_data.clone();
 
 		aggregated_data = get_aggregated_data(PLATFORM, 0, 120, 0);
 
@@ -126,7 +126,7 @@ fn set_aggregated_data_platform_in() {
 		);
 
 		// Reconciled Data
-		let mut double_source_reconciled_data = DataReconciliation::get_reconciled_data(
+		let double_source_reconciled_data = DataReconciliation::get_reconciled_data(
 			DATE_CAMPAIGN.to_vec(),
 			&aggregated_data.platform);
 
@@ -153,7 +153,7 @@ fn set_aggregated_data_platform_in() {
 		);
 
 		// Reconciled Data
-		let mut triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
+		let triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
 			DATE_CAMPAIGN.to_vec(),
 			&aggregated_data.platform
 		);
@@ -164,172 +164,175 @@ fn set_aggregated_data_platform_in() {
 			previous_aggregated_data.clicks
 		);
 
-		// _______________ Client IN Reconciliation Threshold ___________________
-		//++++++++++++++
-		// zdmp:     100
-		// platform: 120
-		// client:   85
-		// total:    85
-		//++++++++++++++
+		// ============= OLD TESTS ARE INVALID SINCE WE DON NOT ACCEPT NOT INCREMENTAL VALUES =========
 
-		// Set Aggregated Data
-		aggregated_data = get_aggregated_data(CLIENT, 0, 85, 0);
+		// // _______________ Client IN Reconciliation Threshold ___________________
+		// //++++++++++++++
+		// // zdmp:     100
+		// // platform: 120
+		// // client:   85
+		// // total:    85
+		// //++++++++++++++
 
-		assert_ok!(
-			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
-		);
+		// // Set Aggregated Data
+		// previous_aggregated_data = aggregated_data.clone();
+		// aggregated_data = get_aggregated_data(CLIENT, 0, 85, 0);
 
-		// Reconciled Data
-		triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
-			DATE_CAMPAIGN.to_vec(),
-			&aggregated_data.platform
-		);
+		// assert_ok!(
+		// 	DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
+		// );
 
-		// Test Total Count
-		assert_eq!(
-			triple_source_reconciled_data.clicks.final_count,
-			aggregated_data.clicks
-		);
+		// // Reconciled Data
+		// triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
+		// 	DATE_CAMPAIGN.to_vec(),
+		// 	&aggregated_data.platform
+		// );
 
-		// _______________ Platform IN Reconciliation Threshold ___________________
-		//++++++++++++++
-		// zdmp:     100
-		// platform: 85
-		// client:   0
-		// total:    85
-		//++++++++++++++
+		// // Test Total Count - Clicks should be incremntal
+		// assert_eq!(
+		// 	triple_source_reconciled_data.clicks.final_count,
+		// 	previous_aggregated_data.clicks
+		// );
 
-		// Set Aggregated Data
-		aggregated_data = get_aggregated_data(CLIENT, 0, 0, 0);
+		// // _______________ Platform IN Reconciliation Threshold ___________________
+		// //++++++++++++++
+		// // zdmp:     100
+		// // platform: 85
+		// // client:   0
+		// // total:    85
+		// //++++++++++++++
 
-		assert_ok!(
-			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
-		);
+		// // Set Aggregated Data
+		// aggregated_data = get_aggregated_data(CLIENT, 0, 0, 0);
 
-		aggregated_data = get_aggregated_data(PLATFORM, 0, 85, 0);
+		// assert_ok!(
+		// 	DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
+		// );
 
-		assert_ok!(
-			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
-		);
+		// aggregated_data = get_aggregated_data(PLATFORM, 0, 85, 0);
 
-		// Reconciled Data
-		double_source_reconciled_data = DataReconciliation::get_reconciled_data(
-			DATE_CAMPAIGN.to_vec(),
-			&aggregated_data.platform
-		);
+		// assert_ok!(
+		// 	DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
+		// );
 
-		// Test Total Count
-		assert_eq!(
-			double_source_reconciled_data.clicks.final_count,
-			aggregated_data.clicks
-		);
+		// // Reconciled Data
+		// double_source_reconciled_data = DataReconciliation::get_reconciled_data(
+		// 	DATE_CAMPAIGN.to_vec(),
+		// 	&aggregated_data.platform
+		// );
 
-		//--------------------- TRIPLE SOURCE - zdmp + platform + client -----------------------
-		// _______________ Client NOT in Reconciliation Threshold ___________________
-		//++++++++++++++
-		// zdmp:     100
-		// platform: 85
-		// client:   120
-		// total:    85
-		//++++++++++++++
+		// // Test Total Count
+		// assert_eq!(
+		// 	double_source_reconciled_data.clicks.final_count,
+		// 	aggregated_data.clicks
+		// );
 
-		// Set Aggregated Data
-		previous_aggregated_data = aggregated_data.clone();
-		aggregated_data = get_aggregated_data(CLIENT, 0, 120, 0);
+		// //--------------------- TRIPLE SOURCE - zdmp + platform + client -----------------------
+		// // _______________ Client NOT in Reconciliation Threshold ___________________
+		// //++++++++++++++
+		// // zdmp:     100
+		// // platform: 85
+		// // client:   120
+		// // total:    85
+		// //++++++++++++++
 
-		assert_ok!(
-			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
-		);
+		// // Set Aggregated Data
+		// previous_aggregated_data = aggregated_data.clone();
+		// aggregated_data = get_aggregated_data(CLIENT, 0, 120, 0);
 
-		// Reconciled Data
-		triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
-			DATE_CAMPAIGN.to_vec(),
-			&aggregated_data.platform
-		);
+		// assert_ok!(
+		// 	DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
+		// );
 
-		// Test Total Count
-		assert_eq!(
-			triple_source_reconciled_data.clicks.final_count,
-			previous_aggregated_data.clicks
-		);
+		// // Reconciled Data
+		// triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
+		// 	DATE_CAMPAIGN.to_vec(),
+		// 	&aggregated_data.platform
+		// );
 
-		// _______________ Client IN Reconciliation Threshold ___________________
-		//++++++++++++++
-		// zdmp:     100
-		// platform: 85
-		// client:   80
-		// total:    80
-		//++++++++++++++
+		// // Test Total Count
+		// assert_eq!(
+		// 	triple_source_reconciled_data.clicks.final_count,
+		// 	previous_aggregated_data.clicks
+		// );
 
-		// Set Aggregated Data
-		aggregated_data = get_aggregated_data(CLIENT, 0, 80, 0);
+		// // _______________ Client IN Reconciliation Threshold ___________________
+		// //++++++++++++++
+		// // zdmp:     100
+		// // platform: 85
+		// // client:   80
+		// // total:    80
+		// //++++++++++++++
 
-		assert_ok!(
-			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
-		);
+		// // Set Aggregated Data
+		// aggregated_data = get_aggregated_data(CLIENT, 0, 80, 0);
 
-		// Reconciled Data
-		triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
-			DATE_CAMPAIGN.to_vec(),
-			&aggregated_data.platform
-		);
+		// assert_ok!(
+		// 	DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
+		// );
 
-		// Test Total Count
-		assert_eq!(
-			triple_source_reconciled_data.clicks.final_count,
-			aggregated_data.clicks
-		);
+		// // Reconciled Data
+		// triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
+		// 	DATE_CAMPAIGN.to_vec(),
+		// 	&aggregated_data.platform
+		// );
 
-		// _______________ Remove Zdmp  ___________________
-		//++++++++++++++
-		// zdmp:     0
-		// platform: 85
-		// client:   80
-		// total:    80
-		//++++++++++++++
+		// // Test Total Count
+		// assert_eq!(
+		// 	triple_source_reconciled_data.clicks.final_count,
+		// 	aggregated_data.clicks
+		// );
 
-		// Set Aggregated Data
-		previous_aggregated_data = aggregated_data.clone();
-		aggregated_data = get_aggregated_data(ZDMP, 0, 0, 0);
+		// // _______________ Remove Zdmp  ___________________
+		// //++++++++++++++
+		// // zdmp:     0
+		// // platform: 85
+		// // client:   80
+		// // total:    80
+		// //++++++++++++++
 
-		assert_ok!(
-			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
-		);
+		// // Set Aggregated Data
+		// previous_aggregated_data = aggregated_data.clone();
+		// aggregated_data = get_aggregated_data(ZDMP, 0, 0, 0);
 
-		// Reconciled Data
-		triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
-			DATE_CAMPAIGN.to_vec(),
-			&aggregated_data.platform
-		);
+		// assert_ok!(
+		// 	DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
+		// );
 
-		// Test Total Count
-		assert_eq!(
-			triple_source_reconciled_data.clicks.final_count,
-			previous_aggregated_data.clicks
-		);
+		// // Reconciled Data
+		// triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
+		// 	DATE_CAMPAIGN.to_vec(),
+		// 	&aggregated_data.platform
+		// );
 
-		// _______________ Take out Client from Threshold  ___________________
-		//++++++++++++++
-		// zdmp:     0
-		// platform: 85
-		// client:   20
-		// total:    85
-		//++++++++++++++
+		// // Test Total Count
+		// assert_eq!(
+		// 	triple_source_reconciled_data.clicks.final_count,
+		// 	previous_aggregated_data.clicks
+		// );
 
-		// Set Aggregated Data
-		aggregated_data = get_aggregated_data(CLIENT, 0, 20, 0);
+		// // _______________ Take out Client from Threshold  ___________________
+		// //++++++++++++++
+		// // zdmp:     0
+		// // platform: 85
+		// // client:   20
+		// // total:    85
+		// //++++++++++++++
 
-		assert_ok!(
-			DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
-		);
+		// // Set Aggregated Data
+		// aggregated_data = get_aggregated_data(CLIENT, 0, 20, 0);
 
-		// Reconciled Data
-		triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
-			DATE_CAMPAIGN.to_vec(),
-			aggregated_data.clone().platform
-		);
+		// assert_ok!(
+		// 	DataReconciliation::set_aggregated_data(Origin::signed(1), aggregated_data.clone())
+		// );
 
-		// Test Total Count
-		assert_eq!(triple_source_reconciled_data.clicks.final_count, 85);
+		// // Reconciled Data
+		// triple_source_reconciled_data = DataReconciliation::get_reconciled_data(
+		// 	DATE_CAMPAIGN.to_vec(),
+		// 	aggregated_data.clone().platform
+		// );
+
+		// // Test Total Count
+		// assert_eq!(triple_source_reconciled_data.clicks.final_count, 85);
 	});
 }

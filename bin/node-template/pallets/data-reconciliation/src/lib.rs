@@ -285,7 +285,7 @@ impl<T: Trait> Module<T> {
 
 		let campaign = Self::get_campaign(&aggregated_data.campaign_id);
 
-		Self::update_recociled_data_record(&campaign, &aggregated_data);
+		let _ = Self::update_recociled_data_record(&campaign, &aggregated_data);
 	}
 
 	fn update_recociled_data_record(
@@ -321,7 +321,7 @@ impl<T: Trait> Module<T> {
 
 		for kpi in kpis.iter_mut() {
 			let (result, (applies, value)) = kpi;
-			Self::run_reconciliation(result, percentage_threshold);
+			Self::run_reconciliation(result, &percentage_threshold);
 
 			let (budget_utilisation, cost) = if *applies {
 				Self::update_costs(result, total_budget, *value, decimals)
@@ -399,11 +399,11 @@ impl<T: Trait> Module<T> {
 		return Ok(())
 	}
 
-	fn run_reconciliation(kpi: &mut Kpis, percentage_threshold: FixedU128) {
+	fn run_reconciliation(kpi: &mut Kpis, percentage_threshold: &FixedU128) {
 		let count_zdmp: FixedU128 = FixedU128::from_inner(kpi.zdmp * QUINTILLION);
 		let count_platform: FixedU128 = FixedU128::from_inner(kpi.platform * QUINTILLION);
 
-		let count_zdmp_threshold = count_zdmp * percentage_threshold;
+		let count_zdmp_threshold = count_zdmp * *percentage_threshold;
 		let count_zdmp_ceil = count_zdmp + count_zdmp_threshold;
 		let count_zdmp_floor = count_zdmp - count_zdmp_threshold;
 
@@ -420,7 +420,7 @@ impl<T: Trait> Module<T> {
 		let count_final: FixedU128 = FixedU128::from_inner(kpi.final_count * QUINTILLION);
 		let count_client: FixedU128 = FixedU128::from_inner(kpi.client * QUINTILLION);
 
-		let count_final_threshold = count_final * percentage_threshold;
+		let count_final_threshold = count_final * *percentage_threshold;
 		let count_final_ceil = count_final + count_final_threshold;
 		let count_final_floor = count_final - count_final_threshold;
 
