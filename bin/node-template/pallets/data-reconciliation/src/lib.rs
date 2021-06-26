@@ -151,9 +151,6 @@ decl_module! {
 		fn set_campaign(origin, campaign_id: CampaignId, campaign: Campaign) {
 			let sender = ensure_signed(origin)?;
 
-			// const MAX_SENSIBLE_REASON_LENGTH: usize = 16384;
-			// ensure!(reason.len() <= MAX_SENSIBLE_REASON_LENGTH, Error::<T>::ReasonTooBig);
-
 			<Campaigns>::insert(&campaign_id, &campaign);
 
 			// Create Event Topic name

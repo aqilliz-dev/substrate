@@ -18,13 +18,16 @@ mod tests;
 
 use frame_support::{
 	weights::{Weight, Pays},
-    decl_module, decl_event, decl_storage,
+    decl_module, decl_event, decl_storage, decl_error,
 	storage::{StorageDoubleMap, StorageMap},
 	codec::{Encode, Decode},
 	sp_runtime::{RuntimeDebug},
 	traits::{Get},
 	dispatch::DispatchResult,
 };
+
+use serde::{Serialize};
+use serde_json::{json, Value};
 
 use frame_system::{self as system, ensure_signed};
 
@@ -55,7 +58,7 @@ type OrderDate = Vec<u8>;
 type ErrorMessage = Vec<u8>;
 type Failed = bool;
 
-#[derive(Encode, Decode, Clone, RuntimeDebug, PartialEq, Eq)]
+#[derive(Encode, Decode, Clone, RuntimeDebug, PartialEq, Eq, Serialize)]
 struct BillboardData {
 	id: BillboardId,
 	spot_duration: u32,
@@ -72,8 +75,9 @@ pub struct Billboard {
 	imp_multiplier_per_day: u32
 }
 
-#[derive(Encode, Decode, Clone, RuntimeDebug, PartialEq, Eq)]
+#[derive(Encode, Decode, Clone, RuntimeDebug, PartialEq, Eq, Serialize)]
 pub struct OrderData {
+	test: Vec<u8>,
 	start_date: i64,
 	end_date: i64,
 	total_spots: u32,
@@ -105,6 +109,13 @@ pub struct SessionData {
 #[derive(Encode, Decode, Clone, Default, RuntimeDebug, PartialEq, Eq)]
 pub struct VerifedSpot {
 	verified_audience: u32
+}
+
+decl_error! {
+	pub enum Error for Module<T: Trait> {
+		SerializingError,
+		InvalidInput
+	}
 }
 
 decl_storage! {
@@ -145,6 +156,8 @@ decl_module! {
 		#[weight = (T::WeightInfo::set_order(order_data.target_inventory.len() as u32), Pays::No)]
 		fn set_order(origin, order_id: OrderId, order_data: OrderData) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
+
+			Self::validate_fields_size_limit(&order_data, vec![("test", 10)])?;
 
 			let order_data_clone = order_data.clone();
 
@@ -203,6 +216,50 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
+	fn validate_fields_size_limit<A: Serialize>(
+		argument: &A,
+		fields: Vec<(&str, usize)>
+	) -> Result<(), Error<T>> {
+		let argument_value = serde_json::to_value(argument)
+			.map_err(|_| Error::<T>::SerializingError)?;
+
+		// let campaign_value = json!(argument_json);
+
+		// let campaign_object = campaign_value.as_object()
+		// 	.ok_or(Error::<T>::SerializingError)?;
+
+		// panic!("{:?}", campaign_value);
+
+		for field in fields.iter() {
+
+			let (name, size) = *field;
+
+			panic!("{:?}", argument_value.pointer("/target_inventory/0/spot_duration").unwrap());
+
+			if argument_value[name].is_array() {
+				let value = argument_value[name].as_array().unwrap();
+				// panic!("lalal");
+
+				if value.len() > size { return Err(Error::<T>::InvalidInput) }
+			}
+
+
+
+			// match field {
+			// 	Value::Array(content) => {
+			// 		if content.len() > size {
+			// 			Err(Error::<T>::InvalidInput)
+			// 		}
+			// 	}
+			// }
+		}
+
+		Ok(())
+
+		// const MAX_SENSIBLE_REASON_LENGTH: usize = 16384;
+		// ensure!(reason.len() <= MAX_SENSIBLE_REASON_LENGTH, Error::<T>::ReasonTooBig);
+	}
+
 	fn order_exists(session_data: &SessionData) -> Result<Order, ErrorMessage> {
 		let order_id = &session_data.order_id;
 		let order = <Orders>::contains_key(order_id);

@@ -1,6 +1,6 @@
 use crate::{mock::*};
 use super::*;
-use frame_support::{assert_ok};
+use frame_support::{assert_ok, assert_noop};
 use crate::{helpers::*};
 
 #[test]
@@ -21,6 +21,23 @@ fn order_set() {
 		assert_eq!(
 			MwReconciliation::get_order(ORDER_ID.to_vec()),
 			order
+		);
+	});
+}
+
+#[test]
+fn order_set_error() {
+	let (order_data, order, _) = sample_data(10);
+
+	new_test_ext().execute_with(|| {
+		// Dispatch a signed extrinsic.
+		assert_noop!(
+			MwReconciliation::set_order(
+				Origin::signed(1),
+				ORDER_ID.to_vec(),
+				order_data
+			),
+			Error::<Test>::InvalidInput
 		);
 	});
 }

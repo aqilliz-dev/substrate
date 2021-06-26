@@ -24,6 +24,7 @@ pub fn sample_data(range: u32) -> (OrderData, Order, SessionData) {
 	}
 
 	let order_data = OrderData {
+		test: b"Some long".to_vec(),
 		start_date: 1614137312,
 		end_date: 1614138312,
 		total_spots: 800,

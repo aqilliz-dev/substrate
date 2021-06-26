@@ -11,7 +11,7 @@ pub fn get_campaign(size: usize) -> Campaign {
 	}
 
 	Campaign {
-		name: b"Coca Cola".to_vec(),
+		name: b"Coca Cola Inc".to_vec(),
 		total_budget: 5000000000,
 		currency: b"SGD".to_vec(),
 		start_date: b"20201010".to_vec(),
