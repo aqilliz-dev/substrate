@@ -55,7 +55,7 @@ type OrderDate = Vec<u8>;
 type ErrorMessage = Vec<u8>;
 type Failed = bool;
 
-#[derive(Encode, Decode, Clone, Default, RuntimeDebug, PartialEq, Eq)]
+#[derive(Encode, Decode, Clone, RuntimeDebug, PartialEq, Eq)]
 struct BillboardData {
 	id: BillboardId,
 	spot_duration: u32,
@@ -72,7 +72,7 @@ pub struct Billboard {
 	imp_multiplier_per_day: u32
 }
 
-#[derive(Encode, Decode, Clone, Default, RuntimeDebug, PartialEq, Eq)]
+#[derive(Encode, Decode, Clone, RuntimeDebug, PartialEq, Eq)]
 pub struct OrderData {
 	start_date: i64,
 	end_date: i64,
@@ -91,7 +91,7 @@ pub struct Order {
 	creative_list: Vec<CreativeId>
 }
 
-#[derive(Encode, Decode, Clone, Default, RuntimeDebug, PartialEq, Eq)]
+#[derive(Encode, Decode, Clone, RuntimeDebug, PartialEq, Eq)]
 pub struct SessionData {
 	id: SessionId,
 	order_id: OrderId,

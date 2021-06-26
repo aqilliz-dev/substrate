@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![feature(bool_to_option)]
 
 #[macro_use]
 mod benchmarking;
@@ -8,6 +9,12 @@ mod mock;
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(feature = "runtime-benchmarks")]
+mod helpers;
+
+#[cfg(test)]
+mod helpers;
 
 use frame_support::{
 	weights::{Weight, Pays},
@@ -36,6 +43,16 @@ pub trait Trait: system::Trait {
 }
 
 const QUINTILLION: u128 = 1_000_000_000_000_000_000;
+const DASH: &[u8] = b"-";
+const TOPIC: &[u8] = b"data-reconcilation";
+const CAMPAIGN_ERROR: &[u8] = b"Campaign ID does not exist";
+const PLATFORM_ERROR: &[u8] = b"Platform does not exist for the Campaign";
+const DATE_ERROR: &[u8] = b"Date does not exist for that Campaign and Platform";
+const DATA_ERROR: &[u8] = b"Aggregated data is not incremental";
+
+const CLIENT: &[u8] = b"client";
+const ZDMP: &[u8] = b"zdmp";
+const PLATFORM: &[u8] = b"platform";
 
 pub type CampaignId = Vec<u8>;
 pub type Platform = Vec<u8>;
@@ -140,9 +157,12 @@ decl_module! {
 			<Campaigns>::insert(&campaign_id, &campaign);
 
 			// Create Event Topic name
-			let topic = T::Hashing::hash(b"data-reconciliation");
+			let topic = T::Hashing::hash(TOPIC);
 
-			let event = <T as Trait>::Event::from(RawEvent::CampaignSet(sender, campaign_id, campaign));
+			let event = <T as Trait>::Event::from(
+				RawEvent::CampaignSet(sender, campaign_id, campaign)
+			);
+
 			frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
 		}
 
@@ -151,147 +171,175 @@ decl_module! {
 			let sender = ensure_signed(origin)?;
 
 			// Create Event Topic name
-			let topic = T::Hashing::hash(b"data-reconciliation");
+			let topic = T::Hashing::hash(TOPIC);
+			let mut message = b"".to_vec();
+			let mut failed = false;
 
-			let campaign_exists = <Campaigns>::contains_key(&aggregated_data.campaign_id);
-
-			if campaign_exists {
-				let campaign = <Campaigns>::get(&aggregated_data.campaign_id);
-				let campaign_platforms = campaign.platforms;
-
-				let campaign_platform_exists = if campaign_platforms.contains(&aggregated_data.platform) {
-					true
-				} else {
-					false
-				};
-
-				if campaign_platform_exists {
-					<ReconciledDateCampaigns>::insert(&aggregated_data.date, &aggregated_data.campaign_id, true);
-					<ReconciledCampaignDates>::insert(&aggregated_data.campaign_id, &aggregated_data.date, true);
-
-					let mut date_campaign = aggregated_data.date.clone();
-					let campaign_id = aggregated_data.campaign_id.clone();
-
-					date_campaign.extend(b"-".to_vec());
-					date_campaign.extend(campaign_id);
-
-					let failed = Self::update_recociled_data_record(&date_campaign, &aggregated_data);
-
-					if failed {
-						let event = <T as Trait>::Event::from(RawEvent::AggregatedDataProcessed(sender, aggregated_data, true, b"Aggregated data is not incremental".to_vec()));
-						frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
-
-						return Ok(())
+			match Self::check_validity(&aggregated_data) {
+				Err(e) => {
+					if e == DATE_ERROR.to_vec() {
+						Self::create_recociled_data_record(&aggregated_data);
+						<ReconciledDateCampaigns>::insert(
+							&aggregated_data.date,
+							&aggregated_data.campaign_id,
+							true
+						);
+						<ReconciledCampaignDates>::insert(
+							&aggregated_data.campaign_id,
+							&aggregated_data.date,
+							true
+						);
+					} else {
+						failed = true;
+						message = e;
 					}
-
-					let event = <T as Trait>::Event::from(RawEvent::AggregatedDataProcessed(sender, aggregated_data, false, b"".to_vec()));
-					frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
-
-					Ok(())
-				} else {
-					let event = <T as Trait>::Event::from(RawEvent::AggregatedDataProcessed(sender, aggregated_data, true, b"Platform does not exist for the Campaign".to_vec()));
-					frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
-
-					Ok(())
+				},
+				Ok(campaign) => {
+					match Self::update_recociled_data_record(&campaign, &aggregated_data) {
+						Err(e) => {
+							failed = true;
+							message = e;
+						},
+						Ok(_) => {}
+					}
 				}
-			} else {
-				let event = <T as Trait>::Event::from(RawEvent::AggregatedDataProcessed(sender, aggregated_data, true, b"Campaign ID does not exist".to_vec()));
-				frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
-
-				Ok(())
 			}
+
+			let event = <T as Trait>::Event::from(
+				RawEvent::AggregatedDataProcessed(sender, aggregated_data, failed, message)
+			);
+
+			frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+
+			Ok(())
 		}
 	}
 }
 
 impl<T: Trait> Module<T> {
-	fn create_recociled_data_record(date_campaign: &DateCampaign, aggregated_data: &AggregatedData) {
-		let mut kpis_impressions = Kpis {
-			final_count: 0,
-			cost: 0,
-			budget_utilisation: 0,
-			zdmp: 0,
-			platform: 0,
-			client: 0
-		};
+	fn get_date_campaign(aggregated_data: &AggregatedData) -> Vec<u8> {
+		[&aggregated_data.date[..], DASH, &aggregated_data.campaign_id[..]].concat()
+	}
 
-		let mut kpis_clicks = Kpis {
-			final_count: 0,
-			cost: 0,
-			budget_utilisation: 0,
-			zdmp: 0,
-			platform: 0,
-			client: 0
-		};
+	fn campaign_exists(
+		aggregated_data: &AggregatedData
+	) -> Result<Campaign, ErrorMessage> {
+		let campaign_id = &aggregated_data.campaign_id;
+		let campaign = <Campaigns>::contains_key(campaign_id);
+		campaign.then_some(Self::get_campaign(campaign_id))
+			.ok_or(CAMPAIGN_ERROR.to_vec())
+	}
 
-		let mut kpis_conversions = Kpis {
-			final_count: 0,
-			cost: 0,
-			budget_utilisation: 0,
-			zdmp: 0,
-			platform: 0,
-			client: 0
-		};
+	fn platform_exists(
+		aggregated_data: &AggregatedData,
+		campaign: &Campaign
+	) -> Result<(), ErrorMessage> {
+		let platform = campaign.platforms.contains(&aggregated_data.platform);
+		platform.then_some(())
+			.ok_or(PLATFORM_ERROR.to_vec())
+	}
 
-		Self::update_kpis(&aggregated_data, &mut kpis_impressions, &mut kpis_clicks, &mut kpis_conversions);
+	fn date_campaign_platform_exists(
+		aggregated_data: &AggregatedData
+	) -> Result<(), ErrorMessage> {
+		let date_campaign = Self::get_date_campaign(aggregated_data);
 
-		kpis_impressions.final_count = *(&aggregated_data.impressions);
-		kpis_clicks.final_count = *(&aggregated_data.clicks);
-		kpis_conversions.final_count = *(&aggregated_data.conversions);
+		let date_campaign_platform = <ReconciledDataStore>::contains_key(
+			&date_campaign,
+			&aggregated_data.platform
+		);
+
+		date_campaign_platform.then_some(())
+			.ok_or(DATE_ERROR.to_vec())
+	}
+
+	fn check_validity(
+		aggregated_data: &AggregatedData
+	) -> Result<Campaign, ErrorMessage> {
+		let campaign = Self::campaign_exists(aggregated_data)?;
+		Self::platform_exists(aggregated_data, &campaign)?;
+		Self::date_campaign_platform_exists(aggregated_data)?;
+		Ok(campaign)
+	}
+
+	fn create_recociled_data_record(aggregated_data: &AggregatedData) {
+		let date_campaign = Self::get_date_campaign(aggregated_data);
+
+		let mut impressions = Kpis::default();
+		let mut clicks = Kpis::default();
+		let mut conversions = Kpis::default();
+
+		let _ = Self::update_kpis(
+			&aggregated_data,
+			&mut impressions,
+			&mut clicks,
+			&mut conversions
+		);
 
 		let record = ReconciledData {
 			amount_spent: 0,
 			budget_utilisation: 0,
-			impressions: kpis_impressions,
-			clicks: kpis_clicks,
-			conversions: kpis_conversions
+			impressions,
+			clicks,
+			conversions
 		};
 
 		<ReconciledDataStore>::insert(&date_campaign, &aggregated_data.platform, record);
+
+		let campaign = Self::get_campaign(&aggregated_data.campaign_id);
+
+		let _ = Self::update_recociled_data_record(&campaign, &aggregated_data);
 	}
 
-	fn update_recociled_data_record(date_campaign: &DateCampaign, aggregated_data: &AggregatedData) -> bool {
-		let campaign_date_platform_exists = <ReconciledDataStore>::contains_key(&date_campaign, &aggregated_data.platform);
-
-		if !campaign_date_platform_exists {
-			Self::create_recociled_data_record(&date_campaign, &aggregated_data);
-		}
-
+	fn update_recociled_data_record(
+		campaign: &Campaign,
+		aggregated_data: &AggregatedData
+	) -> Result<(), ErrorMessage> {
+		let date_campaign = Self::get_date_campaign(aggregated_data);
 		let mut record = <ReconciledDataStore>::get(&date_campaign, &aggregated_data.platform);
 
-		let failed = Self::update_kpis(&aggregated_data, &mut record.impressions, &mut record.clicks, &mut record.conversions);
+		Self::update_kpis(
+			&aggregated_data,
+			&mut record.impressions,
+			&mut record.clicks,
+			&mut record.conversions)?;
 
-		if failed {
-			return true
+		let Campaign {
+			reconciliation_threshold,
+			total_budget,
+			decimals,
+			cpc, cpm, cpl,
+			..
+		} = *campaign;
+
+		let percentage_threshold: FixedU128 = FixedU128::from_inner(reconciliation_threshold) / FixedU128::from_inner(100);
+		let mut total_budget_utilisation = 0;
+		let mut total_cost = 0;
+
+		let mut kpis = [
+			(&mut record.clicks, cpc),
+			(&mut record.conversions, cpl),
+			(&mut record.impressions, cpm)
+		];
+
+		for kpi in kpis.iter_mut() {
+			let (result, (applies, value)) = kpi;
+			Self::run_reconciliation(result, &percentage_threshold);
+
+			let (budget_utilisation, cost) = if *applies {
+				Self::update_costs(result, total_budget, *value, decimals)
+			} else { (0, 0) };
+
+			total_budget_utilisation += budget_utilisation;
+			total_cost += cost;
 		}
 
-		let campaign = <Campaigns>::get(&aggregated_data.campaign_id);
-		let reconciliation_threshold = campaign.reconciliation_threshold;
-		let total_budget = campaign.total_budget;
-		let decimals = campaign.decimals;
-		let (cpc_applies, cpc_val) = campaign.cpc;
-		let (cpm_applies, cpm_val) = campaign.cpm;
-		let (cpl_applies, cpl_val) = campaign.cpl;
-		let percentage_threshold: FixedU128 = FixedU128::from_inner(reconciliation_threshold) / FixedU128::from_inner(100);
-
-		// Clicks
-		Self::run_reconciliation(&mut record.clicks, percentage_threshold);
-		let (cliks_budget_utilization, clicks_cost) = if cpc_applies { Self::update_costs(&mut record.clicks, total_budget, cpc_val, decimals) } else { (0, 0) };
-		// Conversions
-		Self::run_reconciliation(&mut record.conversions, percentage_threshold);
-		let (conversions_budget_utilization, conversions_cost) = if cpl_applies { Self::update_costs(&mut record.conversions, total_budget, cpl_val, decimals) } else { (0, 0) };
-		// Impressions
-		Self::run_reconciliation(&mut record.impressions, percentage_threshold);
-		let (impressions_budget_utilization, impressions_cost) = if cpm_applies { Self::update_costs(&mut record.impressions, total_budget, cpm_val/1000, decimals) } else { (0, 0) };
-
-		// Update 'budget_utilization' and 'amount_spent'
-		record.budget_utilisation = cliks_budget_utilization + conversions_budget_utilization + impressions_budget_utilization;
-		// record.amount_spent = Self::multiply(record.budget_utilisation, total_budget, decimals) / 100;
-		record.amount_spent = clicks_cost + conversions_cost + impressions_cost;
+		record.budget_utilisation = total_budget_utilisation;
+		record.amount_spent = total_cost;
 
 		<ReconciledDataStore>::insert(&date_campaign, &aggregated_data.platform, record);
 
-		return false;
+		Ok(())
 	}
 
 	fn update_kpis(
@@ -299,49 +347,66 @@ impl<T: Trait> Module<T> {
 		kpis_impressions: &mut Kpis,
 		kpis_clicks: &mut Kpis,
 		kpis_conversions: &mut Kpis
-	) -> bool {
-		if *(&aggregated_data.source) == b"zdmp".to_vec() {
-			if
-				aggregated_data.impressions < kpis_impressions.zdmp ||
-				aggregated_data.clicks < kpis_clicks.zdmp ||
-				aggregated_data.conversions < kpis_conversions.zdmp
-			{
-				return true
+	) -> Result<(), ErrorMessage> {
+		let AggregatedData {
+			source,
+			impressions,
+			clicks,
+			conversions,
+			..
+		} = aggregated_data;
+
+		let zdpm_data = (
+			ZDMP.to_vec(),
+			(kpis_impressions.zdmp, kpis_clicks.zdmp, kpis_conversions.zdmp)
+		);
+		let client_data = (
+			CLIENT.to_vec(),
+			(kpis_impressions.client, kpis_clicks.client, kpis_conversions.client)
+		);
+		let platform_data = (
+			PLATFORM.to_vec(),
+			(kpis_impressions.platform, kpis_clicks.platform, kpis_conversions.platform)
+		);
+
+		let mut kpis_collection = [&zdpm_data, &client_data, &platform_data];
+
+		for kpi in kpis_collection.iter_mut() {
+			let (kpi_source, (kpi_impressions, kpi_clicks, kpi_conversions)) = kpi;
+
+			if *source == *kpi_source {
+				if
+					*impressions < *kpi_impressions ||
+					*clicks < *kpi_clicks ||
+					*conversions < *kpi_conversions
+				{
+					return Err(DATA_ERROR.to_vec())
+				}
+
+				if *source == ZDMP.to_vec() {
+					kpis_impressions.zdmp = *impressions;
+					kpis_clicks.zdmp = *clicks;
+					kpis_conversions.zdmp = *conversions;
+				} else if *source == CLIENT.to_vec() {
+					kpis_impressions.client = *impressions;
+					kpis_clicks.client = *clicks;
+					kpis_conversions.client = *conversions;
+				} else if *source == PLATFORM.to_vec() {
+					kpis_impressions.platform = *impressions;
+					kpis_clicks.platform = *clicks;
+					kpis_conversions.platform = *conversions;
+				}
 			}
-			kpis_impressions.zdmp = aggregated_data.impressions;
-			kpis_clicks.zdmp = aggregated_data.clicks;
-			kpis_conversions.zdmp = aggregated_data.conversions;
-		} else if *(&aggregated_data.source) == b"client".to_vec() {
-			if
-				aggregated_data.impressions < kpis_impressions.client ||
-				aggregated_data.clicks < kpis_clicks.client ||
-				aggregated_data.conversions < kpis_conversions.client
-			{
-				return true
-			}
-			kpis_impressions.client = aggregated_data.impressions;
-			kpis_clicks.client = aggregated_data.clicks;
-			kpis_conversions.client = aggregated_data.conversions;
-		} else {
-			if
-				aggregated_data.impressions < kpis_impressions.platform ||
-				aggregated_data.clicks < kpis_clicks.platform ||
-				aggregated_data.conversions < kpis_conversions.platform
-			{
-				return true
-			}
-			kpis_impressions.platform = aggregated_data.impressions;
-			kpis_clicks.platform = aggregated_data.clicks;
-			kpis_conversions.platform = aggregated_data.conversions;
 		}
-		return false
+
+		return Ok(())
 	}
 
-	fn run_reconciliation(kpi: &mut Kpis, percentage_threshold: FixedU128) {
-		let count_zdmp: FixedU128 = FixedU128::from_inner(*(&kpi.zdmp)* QUINTILLION);
-		let count_platform: FixedU128 = FixedU128::from_inner(*(&kpi.platform)* QUINTILLION);
+	fn run_reconciliation(kpi: &mut Kpis, percentage_threshold: &FixedU128) {
+		let count_zdmp: FixedU128 = FixedU128::from_inner(kpi.zdmp * QUINTILLION);
+		let count_platform: FixedU128 = FixedU128::from_inner(kpi.platform * QUINTILLION);
 
-		let count_zdmp_threshold = count_zdmp * percentage_threshold;
+		let count_zdmp_threshold = count_zdmp * *percentage_threshold;
 		let count_zdmp_ceil = count_zdmp + count_zdmp_threshold;
 		let count_zdmp_floor = count_zdmp - count_zdmp_threshold;
 
@@ -355,10 +420,10 @@ impl<T: Trait> Module<T> {
 			}
 		}
 
-		let count_final: FixedU128 = FixedU128::from_inner(*(&kpi.final_count)* QUINTILLION);
-		let count_client: FixedU128 = FixedU128::from_inner(*(&kpi.client)* QUINTILLION);
+		let count_final: FixedU128 = FixedU128::from_inner(kpi.final_count * QUINTILLION);
+		let count_client: FixedU128 = FixedU128::from_inner(kpi.client * QUINTILLION);
 
-		let count_final_threshold = count_final * percentage_threshold;
+		let count_final_threshold = count_final * *percentage_threshold;
 		let count_final_ceil = count_final + count_final_threshold;
 		let count_final_floor = count_final - count_final_threshold;
 

@@ -1,12 +1,10 @@
 #![cfg(feature = "runtime-benchmarks")]
 
 use super::*;
-// extern crate std;
 use frame_system::RawOrigin;
 use frame_benchmarking::{benchmarks, account};
-// use std::string::String;
 use crate::Module as DataReconciliation;
-// use crate::{Campaign, AggregatedData, ReconciledData, Kpis};
+use crate::{helpers::*};
 
 const SEED: u32 = 0;
 
@@ -15,82 +13,20 @@ benchmarks! {
 	set_campaign {
 		let caller = account("caller", 0, SEED);
 
-		let size = 13;
-		let mut platforms_vec = Vec::new();
-		for i in 0..size {
-			platforms_vec.push(b"facebook".to_vec());
-		}
+		let campaign = get_campaign(10);
 
-		let campaign_id = b"ID_001".to_vec();
-		let campaign_id_clone = campaign_id.clone();
-
-		let campaign = Campaign {
-			name: b"Coca Cola".to_vec(),
-			total_budget: 5000000000,
-			currency: b"SGD".to_vec(),
-			start_date: b"20201010".to_vec(),
-			end_date: b"20201111".to_vec(),
-			platforms: platforms_vec,
-			advertiser: b"Coca Cola Inc.".to_vec(),
-			brand: b"Coke".to_vec(),
-			reconciliation_threshold: 15,
-			decimals: 6,
-			version: 1,
-			cpc: (true, 700000),
-			cpm: (true, 2000000),
-			cpl: (true, 1400000),
-			timezone: b"timezone".to_vec(),
-		};
-
-		let campaign_clone = campaign.clone();
-
-	}: set_campaign(RawOrigin::Signed(caller), campaign_id, campaign)
+	}: set_campaign(RawOrigin::Signed(caller), CAMPAIGN_ID.to_vec(), campaign.clone())
 	verify {
-		assert_eq!(DataReconciliation::<T>::get_campaign(campaign_id_clone), campaign_clone);
+		assert_eq!(
+			DataReconciliation::<T>::get_campaign(CAMPAIGN_ID.to_vec()), campaign
+		);
 	}
 
 	set_aggregated_data {
 		let caller: T::AccountId = account("caller", 0, SEED);
 
-		let size = 13;
-		let mut platforms_vec = Vec::new();
-		for i in 0..size {
-			platforms_vec.push(b"facebook".to_vec());
-		}
-
-		let campaign_id = b"ID_001".to_vec();
-		let campaign_id_clone = campaign_id.clone();
-
-		let campaign = Campaign {
-			name: b"Coca Cola".to_vec(),
-			total_budget: 5000000000,
-			currency: b"SGD".to_vec(),
-			start_date: b"20201010".to_vec(),
-			end_date: b"20201111".to_vec(),
-			platforms: platforms_vec,
-			advertiser: b"Coca Cola Inc.".to_vec(),
-			brand: b"Coke".to_vec(),
-			reconciliation_threshold: 15,
-			decimals: 6,
-			version: 1,
-			cpc: (true, 700000),
-			cpm: (true, 2000000),
-			cpl: (true, 1400000),
-			timezone: b"timezone".to_vec(),
-		};
-
-		let campaign_clone = campaign.clone();
-
-		let aggregated_data = AggregatedData {
-			campaign_id: b"ID_001".to_vec(),
-			platform: b"facebook".to_vec(),
-			date: b"20201010".to_vec(),
-			date_received: b"20201111".to_vec(),
-			source: b"zdmp".to_vec(),
-			impressions: 100000,
-			clicks: 30,
-			conversions: 3,
-		};
+		let campaign = get_campaign(10);
+		let aggregated_data = get_aggregated_data(ZDMP, 100000, 30, 3);
 
 		let kpis_clicks = Kpis {
 			final_count: 30,
@@ -129,14 +65,16 @@ benchmarks! {
 
 		let caller_origin: <T as frame_system::Trait>::Origin = RawOrigin::Signed(caller.clone()).into();
 
-		DataReconciliation::<T>::set_campaign(caller_origin, campaign_id, campaign)?;
+		DataReconciliation::<T>::set_campaign(caller_origin, CAMPAIGN_ID.to_vec(), campaign)?;
 
-		let date_campaign = b"20201010-ID_001".to_vec();
-		let platform = aggregated_data.platform.clone();
-
-	}: set_aggregated_data(RawOrigin::Signed(caller), aggregated_data)
+	}: set_aggregated_data(RawOrigin::Signed(caller), aggregated_data.clone())
 	verify {
-		assert_eq!(DataReconciliation::<T>::get_reconciled_data(date_campaign, platform), reconciled_data);
+		assert_eq!(
+			DataReconciliation::<T>::get_reconciled_data(
+				DATE_CAMPAIGN.to_vec(),
+				&aggregated_data.platform),
+			reconciled_data
+		);
 	}
 }
 
