@@ -10,10 +10,7 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-#[cfg(feature = "runtime-benchmarks")]
-mod helpers;
-
-#[cfg(test)]
+#[cfg(any(feature = "runtime-benchmarks", test))]
 mod helpers;
 
 use frame_support::{

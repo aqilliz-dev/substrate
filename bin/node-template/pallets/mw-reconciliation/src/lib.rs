@@ -4,10 +4,7 @@
 #[macro_use]
 mod benchmarking;
 
-#[cfg(feature = "runtime-benchmarks")]
-mod helpers;
-
-#[cfg(test)]
+#[cfg(any(feature = "runtime-benchmarks", test))]
 mod helpers;
 
 #[cfg(test)]
