@@ -1,6 +1,13 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(bool_to_option)]
 
+//! TO-DO / IMPROVE
+//! - Add Extrinsic Input Validator to limit the size of the Vec<u8> inputs
+//! - Control possible integer oveflow
+//! - Since Transactions are "Free", implement a pallet to limmit extrinsics
+//!   calls for a period of blocks -> Prevent from DoS attacks.
+//! - Improve Comments for documentation
+
 #[macro_use]
 mod benchmarking;
 
