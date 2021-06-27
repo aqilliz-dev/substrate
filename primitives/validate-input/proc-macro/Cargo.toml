@@ -1,0 +1,22 @@
+[package]
+name = "sp-validate-input-proc-macro"
+version = "2.0.0"
+authors = ["Nacho Pal <ig.pal.san@gmail.com>"]
+edition = "2018"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro-crate = "0.1.4"
+proc-macro2 = "1.0.6"
+quote = "1.0.3"
+syn = "1.0.7"
+
+# Required for the doc tests
+[features]
+default = [ "std" ]
+std = []

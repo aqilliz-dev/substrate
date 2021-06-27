@@ -51,6 +51,11 @@ default-features = false
 version = '2.0.0'
 path = "../../../../primitives/core"
 
+[dependencies.sp-validate-input]
+default-features = false
+version = '2.0.0'
+path = "../../../../primitives/validate-input"
+
 [dependencies]
 log = '0.4.11'
 serde_json = { version = '1.0.64', default-features = false, features = ['alloc'] }

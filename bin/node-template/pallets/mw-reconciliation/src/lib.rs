@@ -34,6 +34,8 @@ use frame_system::{self as system, ensure_signed};
 use sp_core::Hasher;
 use sp_std::prelude::*;
 
+use sp_validate_input::{ValidateInput};
+
 type BillboardsCount = u32;
 
 pub trait WeightInfo {
@@ -75,7 +77,7 @@ pub struct Billboard {
 	imp_multiplier_per_day: u32
 }
 
-#[derive(Encode, Decode, Clone, RuntimeDebug, PartialEq, Eq, Serialize)]
+#[derive(Encode, Decode, Clone, RuntimeDebug, PartialEq, Eq, Serialize, ValidateInput)]
 pub struct OrderData {
 	test: Vec<u8>,
 	start_date: i64,
@@ -157,7 +159,9 @@ decl_module! {
 		fn set_order(origin, order_id: OrderId, order_data: OrderData) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 
-			Self::validate_fields_size_limit(&order_data, vec![("test", 10)])?;
+			// Self::validate_fields_size_limit(&order_data, vec![("test", 10)])?;
+
+			order_data.validate();
 
 			let order_data_clone = order_data.clone();
 

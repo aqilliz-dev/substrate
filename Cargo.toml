@@ -169,6 +169,7 @@ members = [
 	"primitives/trie",
 	"primitives/utils",
 	"primitives/wasm-interface",
+	"primitives/validate-input",
 	"test-utils/client",
 	"test-utils/derive",
 	"test-utils/runtime",

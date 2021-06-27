@@ -1,0 +1,17 @@
+[package]
+name = "sp-validate-input"
+version = "2.0.0"
+authors = ["Nacho Pal <ig.pal.san@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sp-validate-input-proc-macro = { version = "2.0.0", path = "proc-macro" }
+syn = "1.0"
+quote = "1.0"
+
+# Required for the doc tests
+[features]
+default = [ "std" ]
+std = []

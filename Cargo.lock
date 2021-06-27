@@ -3624,6 +3624,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std",
+ "sp-validate-input",
 ]
 
 [[package]]
@@ -8585,6 +8586,25 @@ dependencies = [
  "futures-timer 3.0.2",
  "lazy_static",
  "prometheus",
+]
+
+[[package]]
+name = "sp-validate-input"
+version = "2.0.0"
+dependencies = [
+ "quote",
+ "sp-validate-input-proc-macro",
+ "syn",
+]
+
+[[package]]
+name = "sp-validate-input-proc-macro"
+version = "2.0.0"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
