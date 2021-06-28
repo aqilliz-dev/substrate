@@ -6,6 +6,7 @@
 //! - Control possible integer oveflow
 //! - Since Transactions are "Free", implement a pallet to limmit extrinsics
 //!   calls for a period of blocks -> Prevent from DoS attacks.
+//! - Use substrate-fixed crate instead
 //! - Improve Comments for documentation
 
 #[macro_use]
