@@ -165,6 +165,10 @@ decl_module! {
 
 			<Orders>::insert(&order_id, &order);
 
+			if <Orders>::contains_key(&order_id) {
+				<Billboards>::remove_prefix(&order_id);
+			}
+
 			for billboard_data in order_data.clone().target_inventory.iter() {
 				let billboard = Billboard {
 					spot_duration: billboard_data.spot_duration,
@@ -206,19 +210,19 @@ decl_module! {
 						if session_data.timestamp >= order.start_date && session_data.timestamp <= order.end_date {
 							let billboard = <Billboards>::get(&session_data.order_id, &session_data.billboard_id);
 
-							if session_data.duration >= billboard.spot_duration {
+							// if session_data.duration >= billboard.spot_duration {
 								Self::update_verified_spots(session_data.clone(), billboard.clone());
 
 								let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, false, b"".to_vec()));
 								frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
 
 								Ok(())
-							} else {
-								let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, true, b"Duration is lower than expected".to_vec()));
-								frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
+							// } else {
+							// 	let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, true, b"Duration is lower than expected".to_vec()));
+							// 	frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
 
-								Ok(())
-							}
+							// 	Ok(())
+							// }
 						} else {
 							let event = <T as Trait>::Event::from(RawEvent::SessionDataProcessed(sender, session_data, true, b"Timestamp out of Order period range".to_vec()));
 							frame_system::Module::<T>::deposit_event_indexed(&[topic], event.into());
