@@ -109,32 +109,32 @@ nohup /aquila-node/target/release/node-template \
   --offchain-worker WhenValidating \
 	--name node_validator &
 
-# sleep 5
+sleep 5
 
-# curl http://localhost:9933 -H "Content-Type:application/json;charset=utf-8" -d "@/aquila-node/config/aura-keys.json"
+curl http://localhost:9933 -H "Content-Type:application/json;charset=utf-8" -d "@/aquila-node/config/aura-keys.json"
 
-# curl http://localhost:9933 -H "Content-Type:application/json;charset=utf-8" -d "@/aquila-node/config/grandpa-keys.json"
+curl http://localhost:9933 -H "Content-Type:application/json;charset=utf-8" -d "@/aquila-node/config/grandpa-keys.json"
 
-# curl http://localhost:9933 -H "Content-Type:application/json;charset=utf-8" -d "@/aquila-node/config/offchain-worker-fqs!-keys.json"
+curl http://localhost:9933 -H "Content-Type:application/json;charset=utf-8" -d "@/aquila-node/config/offchain-worker-fqs!-keys.json"
 
-# kill $(ps aux | grep '[t]arget/release/node-template' | awk '{print $2}')
+kill $(ps aux | grep '[t]arget/release/node-template' | awk '{print $2}')
 
-# rm -rf ./aquila-node/config/aura-keys.json
+rm -rf ./aquila-node/config/aura-keys.json
 
-# rm -rf ./aquila-node/config/grandpa-keys.json
+rm -rf ./aquila-node/config/grandpa-keys.json
 
-# /aquila-node/target/release/node-template \
-#   --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
-# 	--base-path /tmp/validator_1 \
-# 	--chain=/aquila-node/config/chainSpecRaw.json \
-# 	--port 30333 \
-# 	--ws-port 9944 \
-#   --pruning 256 \
-# 	--rpc-port 9933 \
-#   --rpc-cors all \
-# 	--validator \
-#   --ws-external \
-#   --rpc-external \
-# 	--rpc-methods=Unsafe \
-#   --offchain-worker WhenValidating /
-# 	--name node_validator
+/aquila-node/target/release/node-template \
+  --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
+	--base-path /tmp/validator_1 \
+	--chain=/aquila-node/config/chainSpecRaw.json \
+	--port 30333 \
+	--ws-port 9944 \
+  --pruning 256 \
+	--rpc-port 9933 \
+  --rpc-cors all \
+	--validator \
+  --ws-external \
+  --rpc-external \
+	--rpc-methods=Unsafe \
+  --offchain-worker WhenValidating /
+	--name node_validator

@@ -48,23 +48,8 @@ RUN rm -r /substrate
 
 FROM substrate as aquila-node
 
-# RUN chmod +x /aquila-node/config/docker-run.sh
+RUN chmod +x /aquila-node/config/docker-run.sh
 
-# ENTRYPOINT ["/aquila-node/config/docker-run.sh"]
+ENTRYPOINT ["/aquila-node/config/docker-run.sh"]
 
-RUN nohup /aquila-node/target/release/node-template \
-  --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
-	--base-path /tmp/validator_1 \
-	--chain=/aquila-node/config/chainSpecRaw.json \
-	--port 30333 \
-  --pruning 256 \
-	--ws-port 9944 \
-	--rpc-port 9933 \
-  --rpc-cors all \
-	--validator \
-  --ws-external \
-  --rpc-external \
-	--rpc-methods=Unsafe \
-  --offchain-worker WhenValidating \
-	--name node_validator &
 
