@@ -5,7 +5,7 @@
 // Make the WASM binary available.
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
-
+use frame_system::EnsureRoot;
 use pallet_grandpa::AuthorityId as GrandpaId;
 use sp_api::impl_runtime_apis;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
@@ -305,6 +305,22 @@ impl pallet_provenanceledger::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 }
 
+parameter_types! {
+	pub const MaxWellKnownNodes: u32 = 8;
+	pub const MaxPeerIdLength: u32 = 128;
+}
+
+impl pallet_node_authorization::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type MaxWellKnownNodes = MaxWellKnownNodes;
+	type MaxPeerIdLength = MaxPeerIdLength;
+	type AddOrigin = EnsureRoot<AccountId>;
+	type RemoveOrigin = EnsureRoot<AccountId>;
+	type SwapOrigin = EnsureRoot<AccountId>;
+	type ResetOrigin = EnsureRoot<AccountId>;
+	type WeightInfo = ();
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub struct Runtime {
@@ -318,7 +334,8 @@ construct_runtime!(
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
 		Nicks: pallet_nicks,
-		ProvenanceLedger: pallet_provenanceledger
+		ProvenanceLedger: pallet_provenanceledger,
+		NodeAuthorization: pallet_node_authorization::{Pallet, Call, Storage, Event<T>, Config<T>}
 	}
 );
 
