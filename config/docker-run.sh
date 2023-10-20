@@ -98,9 +98,8 @@ nohup /aquila-node/target/release/node-template \
 	--base-path /tmp/validator_1 \
 	--chain=/aquila-node/config/chainSpecRaw.json \
 	--port 30333 \
+	--rpc-port 9944 \
   --pruning 256 \
-	--ws-port 9944 \
-	--rpc-port 9933 \
   --rpc-cors all \
 	--validator \
   --ws-external \
@@ -128,9 +127,8 @@ rm -rf ./aquila-node/config/grandpa-keys.json
 	--base-path /tmp/validator_1 \
 	--chain=/aquila-node/config/chainSpecRaw.json \
 	--port 30333 \
-	--ws-port 9944 \
+	--rpc-port 9944 \
   --pruning 256 \
-	--rpc-port 9933 \
   --rpc-cors all \
 	--validator \
   --ws-external \
