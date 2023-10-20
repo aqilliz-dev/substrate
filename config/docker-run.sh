@@ -88,39 +88,51 @@
 
 FILE=/aquila-node/config/customSpecRaw.json
 if test -f "$FILE"; then
-    echo "chainSpecRaw.json provided"
+    echo "customSpecRaw.json provided"
 else
   /aquila-node/target/release/node-template build-spec --chain=/aquila-node/config/chainSpec.json --raw --disable-default-bootnode > /aquila-node/config/chainSpecRaw.json
 fi
 
+# nohup ./aquila-node/target/release/node-template \
+#   --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
+# 	--base-path /tmp/validator_1 \
+# 	--chain=/aquila-node/config/customSpecRaw.json \
+# 	--port 30333 \
+#   --pruning 256 \
+# 	--rpc-port 9944 \
+#   --rpc-cors all \
+# 	--validator \
+#   --rpc-external \
+# 	--rpc-methods=Unsafe \
+#   --offchain-worker when-authority \
+# 	--name node_validator &
+
 nohup /aquila-node/target/release/node-template \
-  --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
-	--base-path /tmp/validator_1 \
-	--chain=/aquila-node/config/chainSpecRaw.json \
-	--port 30333 \
-	--rpc-port 9944 \
-  --pruning 256 \
+  --base-path /tmp/validator_1 \
+  --chain /aquila-node/config/customSpecRaw.json \
+  --port 30333 \
+  --rpc-port 9944 \
   --rpc-cors all \
-	--validator \
-  --ws-external \
+  --telemetry-url "wss://telemetry.polkadot.io/submit/ 0" \
+  --validator \
   --rpc-external \
-	--rpc-methods=Unsafe \
-  --offchain-worker WhenValidating \
-	--name node_validator &
+  --rpc-methods Unsafe \
+  --name node_validator &
+  
 
 sleep 5
 
-curl http://localhost:9933 -H "Content-Type:application/json;charset=utf-8" -d "@/aquila-node/config/aura-keys.json"
+curl http://localhost:9944 -H "Content-Type:application/json;charset=utf-8" -d "@/aquila-node/config/aura-keys.json"
 
-curl http://localhost:9933 -H "Content-Type:application/json;charset=utf-8" -d "@/aquila-node/config/grandpa-keys.json"
+curl http://localhost:9944 -H "Content-Type:application/json;charset=utf-8" -d "@/aquila-node/config/grandpa-keys.json"
 
-curl http://localhost:9933 -H "Content-Type:application/json;charset=utf-8" -d "@/aquila-node/config/offchain-worker-fqs!-keys.json"
+curl http://localhost:9944 -H "Content-Type:application/json;charset=utf-8" -d "@/aquila-node/config/offchain-worker-fqs!-keys.json"
 
 kill $(ps aux | grep '[t]arget/release/node-template' | awk '{print $2}')
 
-rm -rf ./aquila-node/config/aura-keys.json
+rm -rf /aquila-node/config/aura-keys.json
 
-rm -rf ./aquila-node/config/grandpa-keys.json
+rm -rf /aquila-node/config/grandpa-keys.json
 
 /aquila-node/target/release/node-template \
   --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
@@ -128,11 +140,8 @@ rm -rf ./aquila-node/config/grandpa-keys.json
 	--chain=/aquila-node/config/chainSpecRaw.json \
 	--port 30333 \
 	--rpc-port 9944 \
-  --pruning 256 \
   --rpc-cors all \
 	--validator \
-  --ws-external \
   --rpc-external \
 	--rpc-methods=Unsafe \
-  --offchain-worker WhenValidating /
 	--name node_validator

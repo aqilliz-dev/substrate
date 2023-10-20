@@ -7,10 +7,13 @@ EXPOSE 9944 30333 9933
 RUN apt-get update && apt upgrade -y 
 RUN apt install build-essential -y
 RUN apt install --assume-yes git clang curl libssl-dev protobuf-compiler
-RUN rustup default stable
-RUN rustup update
-RUN rustup update nightly
-RUN rustup target add wasm32-unknown-unknown --toolchain nightly
+RUN rustup toolchain install nightly-2023-10-20
+RUN rustup default nightly-2023-10-20
+RUN rustup target add wasm32-unknown-unknown --toolchain nightly-2023-10-20
+# RUN rustup default stable
+# RUN rustup update
+# RUN rustup update nightly
+# RUN rustup target add wasm32-unknown-unknown --toolchain nightly
 
 # RUN apt-get update \
 # 	&& apt upgrade -y \
@@ -29,7 +32,7 @@ RUN rustup target add wasm32-unknown-unknown --toolchain nightly
 
 COPY . .
 
-RUN cargo build --release
+RUN WASM_BUILD_TOOLCHAIN=nightly-2023-10-20 cargo build --release
 
 # CMD ./target/release/node-template --dev
 
@@ -51,5 +54,29 @@ FROM substrate as aquila-node
 RUN chmod +x /aquila-node/config/docker-run.sh
 
 ENTRYPOINT ["/aquila-node/config/docker-run.sh"]
+
+# CMD ["sh", "-c", "/aquila-node/target/release/node-template", \
+# 	 "--base-path ","/tmp/validator_1 ", \
+# 	 "--chain","/aquila-node/config/customSpecRaw.json", \
+# 	 "--port","30333", \
+# 	 "--rpc-port", "9944", \
+# 	 "--rpc-cors","all", \
+# 	 "--telemetry-url","wss://telemetry.polkadot.io/submit/ 0", \
+# 	 "--validator", \
+# 	 "--rpc-external", \
+# 	 "--rpc-methods", "Unsafe", \
+# 	 "--name", "node_validator" \
+# 	]
+# RUN nohup ./target/release/node-template \
+#   --base-path /tmp/validator_1 \
+#   --chain ./config/customSpecRaw.json \
+#   --port 30333 \
+#   --rpc-port 9944 \
+#   --rpc-cors all \
+#   --telemetry-url "wss://telemetry.polkadot.io/submit/ 0" \
+#   --validator \
+#   --rpc-external \
+#   --rpc-methods Unsafe \
+#   --name node_validator &
 
 
