@@ -158,14 +158,14 @@ fn testnet_genesis(
 		transaction_payment: Default::default(),
 		node_authorization: NodeAuthorizationConfig {
 			nodes: vec![
-			  (
-				OpaquePeerId(bs58::decode("12D3KooWBmAwcd4PJNJvfV89HwE48nwkRmAgo8Vy3uQEyNNHBox2").into_vec().unwrap()),
+			(
+				OpaquePeerId(bs58::decode("12D3KooWEJW4z7qbQs56YfAUFfYXxoe1chKquE3aKa56GSoyFvoT").into_vec().unwrap()),
 				endowed_accounts[0].clone()
-			  ),
-			  (
-				OpaquePeerId(bs58::decode("12D3KooWQYV9dGMFoRzNStwpXztXaBUjtPqi6aU76ZgUriHhKust").into_vec().unwrap()),
+			),
+			(
+				OpaquePeerId(bs58::decode("12D3KooWBBQPAbBeGabLh3avLhCRXFxJZkqQQdG3VErFQNM3rfQt").into_vec().unwrap()),
 				endowed_accounts[1].clone()
-			  ),
+			),
 			],
 		  },
 	}
