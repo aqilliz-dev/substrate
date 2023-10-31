@@ -306,7 +306,7 @@ impl pallet_provenanceledger::Config for Runtime {
 }
 
 parameter_types! {
-	pub const MaxWellKnownNodes: u32 = 8;
+	pub const MaxWellKnownNodes: u32 = 50;
 	pub const MaxPeerIdLength: u32 = 128;
 }
 
